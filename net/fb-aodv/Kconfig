@@ -1,0 +1,9 @@
+#
+# FB aodv
+#
+
+config FB_AODV
+	tristate "FB-aodv"
+	#depends on NET
+	#EXTRA_CFLAGS += -DNOMIPS -fno-pic
+        default y

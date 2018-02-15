@@ -161,20 +161,35 @@ int gen_hello() {
 }
 
 int recv_hello(task * tmp_packet) {
-	aodv_neigh *hello_orig;
-	hello * tmp_hello;
+int k = 0,is_rcvp = 0,i;
+extern int dtn_register;
+unsigned char tos;
+aodv_neigh *hello_orig;
+hello * tmp_hello;
 	hello_extension *tmp_hello_extension;
-	int i;
-	u_int8_t load = 0;
+u_int8_t load = 0;
 	u_int16_t load_seq = 0;
 
-	tmp_hello= (hello *)tmp_packet->data;
+
+
+aodv_route *tmp_route;	
+brk_link *tmp_link;
+tmp_link = brk_list;
+tmp_hello= (hello *)tmp_packet->data;
+
+
+tmp_route = first_aodv_route();
+
 	tmp_hello_extension = (hello_extension *) ((void*)tmp_packet->data
 			+ sizeof(hello));
 
+
+	
+	
+	
+
 #ifdef BLACKLIST
 	//block the aodv blacklist
-	int k = 0;
 	for(k=0; k<aodv_blacksize; k++) {
 		if (aodv_blacklist_ip[k] == tmp_packet->src_ip)
 			return 0;
@@ -211,10 +226,10 @@ int recv_hello(task * tmp_packet) {
             扫描断路表，并对相应条目发起路由发现
 		**********************************************/
 		//printk("Start to manage brk_list in hello.c!\n");
-		brk_link *tmp_link;
-		tmp_link = brk_list;
-		int is_rcvp = 0;
-		unsigned char tos;
+	//	brk_link *tmp_link;
+//		tmp_link = brk_list;
+		
+		
 		//默认速率为1Mbps类型，可能需要进行调整
 
 		tos = 0x02;
@@ -265,8 +280,7 @@ int recv_hello(task * tmp_packet) {
 
 		/*********************manage route redirection*********************/
 		
-		aodv_route *tmp_route;
-		tmp_route = first_aodv_route();
+		
 		while(tmp_route && tmp_route->state != INVALID){
 			if( (tmp_route->src_ip != tmp_route->dst_ip)
 					&&(tmp_route->src_ip !=g_mesh_ip) ){//not self route
@@ -278,14 +292,15 @@ int recv_hello(task * tmp_packet) {
 
 #ifdef DTN
 
-			extern int dtn_register;
+			//extern int dtn_register;
 			if( (tmp_route->src_ip == g_mesh_ip) && dtn_register 
 					&& (tmp_route->src_ip != tmp_route->dst_ip) ){//I'm the source,tell DTN
 
 				u_int32_t para[4];
 				para[0] = tmp_route->src_ip;
 				para[1] = tmp_route->dst_ip;
-				para[2] = NULL;
+			//	para[2] = NULL;
+				para[2] = 0;
 				para[3] = (u_int32_t)RRDP_MESSAGE;
 				send2dtn((void*)para,DTNPORT);
 #ifdef CaiDebug

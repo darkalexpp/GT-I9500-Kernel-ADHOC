@@ -163,31 +163,33 @@ int packet_in(struct sk_buff *packet, struct timeval tv) {
 extern int initialized;
 unsigned int input_handler(unsigned int hooknum, struct sk_buff *skb,
 		const struct net_device *in, const struct net_device *out, int (*okfn) (struct sk_buff *)) {
+static int t = 1;
+	int k = 0;
+char src[16];
+	char dst[16];
+extern u_int32_t g_mesh_ip;
+	struct iphdr *ip = ip_hdr(skb);
 	struct timeval tv;
-
+	struct in_device *tmp_indev = (struct in_device *) in->ip_ptr;
+	
+	void *p = (uint32_t *) ip + ip->ihl;
+void *loc_data;
 	u_int8_t aodv_type;
 	int start_point = sizeof(struct udphdr) + sizeof(struct iphdr);
+struct udphdr *udp = (struct udphdr *) p;
 	aodv_type = (int) skb->data[start_point];
-
-	struct iphdr *ip = ip_hdr(skb);
-	struct in_device *tmp_indev = (struct in_device *) in->ip_ptr;
-
-	void *p = (uint32_t *) ip + ip->ihl;
-	struct udphdr *udp = (struct udphdr *) p;
 
 	if (!initialized) { // this is required otherwise kernel calls this function without insmod completing the module loading process.
 		return NF_ACCEPT;
 	}
 
 
-	char src[16];
-	char dst[16];
+	
 	strcpy(src, inet_ntoa(ip->saddr));
 	strcpy(dst, inet_ntoa(ip->daddr));
  
 
 #ifdef DTN
-	static int t = 1;
 	//DTN register
 	if (t && !dtn_register && udp->dest == htons(DTNREGISTER)){
 		dtn_register = 1;
@@ -195,7 +197,7 @@ unsigned int input_handler(unsigned int hooknum, struct sk_buff *skb,
 		printk("*************DTN registered*************\n");
 	}
 	
-	extern u_int32_t g_mesh_ip;	
+		
 	if( dtn_register && udp->dest == htons(GET_DTN_HELLO) ){
 		insert_timer_simple(TASK_DTN_HELLO, 0, g_mesh_ip);
 		update_timer_queue();
@@ -206,12 +208,13 @@ unsigned int input_handler(unsigned int hooknum, struct sk_buff *skb,
 		extern u_int32_t dtn_hello_ip;
 		extern u_int32_t longitude;
 		extern u_int32_t latitude;
-		void *loc_data;
+		//void *loc_data;
+		u_int32_t src_ip,tos,x,y;
 		loc_data = &(skb->data[start_point]);
-		u_int32_t src_ip = ((u_int32_t *)loc_data)[0];
-		u_int32_t tos = ((u_int32_t *)loc_data)[1];
-		u_int32_t x = ((u_int32_t *)loc_data)[2];
-		u_int32_t y = ((u_int32_t *)loc_data)[3];
+		src_ip = ((u_int32_t *)loc_data)[0];
+		tos = ((u_int32_t *)loc_data)[1];
+		x = ((u_int32_t *)loc_data)[2];
+		y = ((u_int32_t *)loc_data)[3];
 		longitude = x;
 		latitude = y;
 		/*u_int32_t src_ip = ((u_int32_t *)skb->data)[0];
@@ -227,7 +230,6 @@ unsigned int input_handler(unsigned int hooknum, struct sk_buff *skb,
 		update_timer_queue();
 }
 #ifdef BLACKLIST
-	int k = 0;
 	if (udp->dest == htons(9556)) {
 		for(k=0; k<dtn_blacksize; k++) {
 			if (!strcmp("192.168.1.255",dst) && dtn_blacklist_ip[k] == ip->saddr) {

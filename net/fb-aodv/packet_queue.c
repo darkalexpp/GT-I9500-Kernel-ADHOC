@@ -416,13 +416,13 @@ static ctl_table ipq_table[] = {
 	{  }
 };
 
-static ctl_table ipq_dir_table[] = {
-                                       {NET_IPV4, "ipv4", NULL, 4, 0555, ipq_table, 0, 0, 0, 0, 0},
+ctl_table ipq_dir_table[] = {
+                                       {(void *)NET_IPV4,"ipv4",(u_int32_t)NULL, 4,(void *)0555,(void *)ipq_table, 0, 0, 0},
                                        { 0 }
                                    };
 
-static ctl_table ipq_root_table[] = {
-                                        {CTL_NET, "net", NULL, 4, 0555, ipq_dir_table, 0, 0, 0, 0, 0},
+ctl_table ipq_root_table[] = {
+                                        {(void *)CTL_NET, "net", (u_int32_t)NULL, 4, (void *)0555, (void *)ipq_dir_table, 0, 0, 0},
                                         { 0 }
                                     };
 

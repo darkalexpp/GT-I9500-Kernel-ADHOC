@@ -10,7 +10,6 @@
  ***************************************************************************/
 #include "aodv_neigh.h"
 
-
 extern u_int32_t g_mesh_ip;
 extern u_int8_t g_routing_metric;
 extern u_int16_t g_fixed_rate; 
@@ -19,6 +18,8 @@ extern aodv_dev *g_mesh_dev;
 extern aodv_route *g_local_route;
 
 aodv_neigh *aodv_neigh_list;
+
+//#define UNUSED(xused) (void)xused;
 
 //rwlock_t neigh_lock = RW_LOCK_UNLOCKED;
 DEFINE_RWLOCK(neigh_lock);
@@ -76,9 +77,9 @@ aodv_neigh *find_aodv_neigh(u_int32_t target_ip) {
 
 int delete_aodv_neigh(u_int32_t ip) {
 	aodv_neigh *tmp_neigh;
-	aodv_route *tmp_route;
+	aodv_route __attribute__((unused))*tmp_route;
 	aodv_neigh *prev_neigh = NULL;
-	src_list_entry *tmp_src_entry;
+	src_list_entry __attribute__((unused))*tmp_src_entry;
 	int index;
 
 	neigh_write_lock(); //to avoid conflicts with read_neigh_proc and packet_out.c (uncontrolled interruption)

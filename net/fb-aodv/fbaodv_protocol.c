@@ -86,6 +86,7 @@ module_param(nominal_rate,uint,0);
  ****************************************************/
 
 static int __init init_fbaodv_module(void) {
+int k=0;
 	char *tmp_str = NULL;
 	inet_aton("0.0.0.0", &g_null_ip);
 
@@ -183,18 +184,16 @@ static int __init init_fbaodv_module(void) {
 			return(-1);
 	}
 	
-#ifdef BLACKLIST
+#ifdef BLACKLIST 
 	if (aodv_blacksize) {
 		printk("AODV BLACK LIST:\n");
-		int k;
 		for (k = 0; k < aodv_blacksize; k++) {
 			printk("           %s\n", aodv_blacklist[k]);
 			inet_aton(aodv_blacklist[k], &aodv_blacklist_ip[k]);
 		}
 	}
 	if (dtn_blacksize) {
-		printk("DTN BLACK LIST:\n");
-		int k;
+		printk("DTN BLACK LIST:\n");		
 		for (k = 0; k < dtn_blacksize; k++) {
 			printk("           %s\n", dtn_blacklist[k]);
 			inet_aton(dtn_blacklist[k], &dtn_blacklist_ip[k]);

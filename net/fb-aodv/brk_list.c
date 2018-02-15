@@ -169,7 +169,7 @@ int is_overlapped_with_brk_link(aodv_route *tmp_route){
 int cleanup_brk_list(void) {
 	brk_link *dead_link, *tmp_link;
 
-	int error;
+	int __attribute__((unused))error;
 
 	tmp_link = brk_list;
 	//如果断路表不为空，直接一个一个删除，无需像路由表一样跟内核交互

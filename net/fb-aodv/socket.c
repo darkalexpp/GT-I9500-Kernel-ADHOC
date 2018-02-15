@@ -122,7 +122,7 @@ int local_broadcast(u_int8_t ttl, void *data,const size_t datalen)
 
 #ifdef DTN
 
-static int bind_to_device(struct socket *sock, char *ifname)//get local ip,bind with socket
+static inline int bind_to_device(struct socket *sock, char *ifname)//get local ip,bind with socket
 {
     struct net *net;
     struct net_device *dev;
@@ -147,7 +147,7 @@ static int bind_to_device(struct socket *sock, char *ifname)//get local ip,bind 
     }
     return 0;
 }
-static int connect_to_addr(struct socket *sock, u_int32_t dstip)//get aim ip and port, connect it with socket
+static inline int connect_to_addr(struct socket *sock, u_int32_t dstip)//get aim ip and port, connect it with socket
 {
     struct sockaddr_in daddr;
     int err;
@@ -252,10 +252,10 @@ int send2dtn(void * data,unsigned short port){
 	//printk("send to DTN\n");
 
 
-    	u_int32_t src_ip = ((u_int32_t *)data)[0];
+    	u_int32_t __attribute__((unused))src_ip = ((u_int32_t *)data)[0];
 	u_int32_t dst_ip = ((u_int32_t *)data)[1];
-	u_int32_t last_avail_ip = ((u_int32_t *)data)[2];
-	u_int32_t type = ((u_int32_t *)data)[3];
+	u_int32_t __attribute__((unused))last_avail_ip = ((u_int32_t *)data)[2];
+	u_int32_t __attribute__((unused))type = ((u_int32_t *)data)[3];
 	//int datalen = 18;
 
 #ifdef DEBUG
@@ -275,7 +275,7 @@ int send2dtn(void * data,unsigned short port){
     u_int32_t space;
     int len;
 
-    aodv_neigh *tmp_neigh;
+    aodv_neigh __attribute__((unused))*tmp_neigh;
 
 
 
@@ -343,13 +343,18 @@ int send2dtn(void * data,unsigned short port){
 }
 
 int query_location(unsigned short port){
-
+	struct msghdr msg;
+    struct iovec iov;
+	    aodv_dev *tmp_dev;
+    mm_segment_t oldfs;
+    u_int32_t space;
+    int len;
+	aodv_neigh __attribute__((unused))*tmp_neigh;
+void *data;
 	int datalen = 16;
-	
 	char str[16];
 	strcpy(str,"Query Location");
-	
-	void *data = (void *)str;
+	data = (void *)str;
 
 
 #ifdef CaiDebug
@@ -360,14 +365,8 @@ int query_location(unsigned short port){
 
 
 
-    struct msghdr msg;
-    struct iovec iov;
-    aodv_dev *tmp_dev;
-    mm_segment_t oldfs;
-    u_int32_t space;
-    int len;
-
-    aodv_neigh *tmp_neigh;
+    
+    
 
 
 

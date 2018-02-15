@@ -26,7 +26,7 @@ int recv_rreq(task * tmp_packet) {
 	rreq *tmp_rreq = NULL;
 	aodv_neigh *tmp_neigh;
 	int iam_destination = 0;
-
+extern int dtn_register;
 	tmp_rreq = tmp_packet->data;
 	convert_rreq_to_host(tmp_rreq);
 
@@ -115,14 +115,13 @@ int recv_rreq(task * tmp_packet) {
 		//manage dttl
 		//if it's a rreq for looking for DTN neighbors
 		//the dst would not be any ip of local net
-		extern dtn_register;
 		if(dtn_register){
 			if(tmp_rreq->dttl>=1){
 				u_int32_t para[4];
 				para[0] = tmp_rreq->src_ip;
 				para[1] = (u_int32_t)tmp_rreq->tos;
-				para[2] = NULL;
-				para[3] = NULL;
+				para[2] = (u_int32_t)NULL;
+				para[3] = (u_int32_t)NULL;
 				send2dtn((void*)para,DTN_LOCATION_PORT);			
 				//gen_rrep(tmp_rreq->src_ip,tmp_rreq->dst_ip,tmp_rreq->tos);
 				tmp_rreq->dttl = tmp_rreq->dttl - 1;
@@ -225,7 +224,7 @@ int resend_rreq(task * tmp_packet) {
 int gen_rreq(u_int32_t src_ip, u_int32_t dst_ip, unsigned char tos) {
 	rreq *out_rreq;
 	u_int8_t out_ttl;
-	flow_type *new_flow;
+	flow_type __attribute__((unused))*new_flow;
 
 //printk("-----------------gen rreq--------------\n");
 //	new_flow = find_flow_type(tos);

@@ -9,12 +9,14 @@
  Modified by Miguel Catalan Cid - miguel.catcid@gmail.com - Version: Mon Jan 1 2010
  ***************************************************************************/
 #include "rerr.h"
+#include <linux/sched.h>
+#include <linux/kthread.h>
 
 extern u_int32_t g_mesh_ip;
 extern u_int32_t g_null_ip;
 extern u_int8_t g_aodv_gateway;
 extern u_int8_t g_routing_metric;
-
+u_int32_t para[4];
 
 int reply_to_rrer(u_int32_t source, u_int32_t destination) {
 
@@ -27,10 +29,12 @@ int reply_to_rrer(u_int32_t source, u_int32_t destination) {
 
 //brk_dst_ipΪ�ѶϿ���·��Ŀ��ip
 int gen_rerr(u_int32_t brk_dst_ip) {
+	u_int32_t lastavail;
 	aodv_route *tmp_route;
 	rerr *tmp_rerr;
 	int expired_routes = 0;
-
+extern int dtn_register;
+	brk_link *tmp_link;
 	//�ҵ���һ��aodv·��
 	tmp_route = first_aodv_route();
 
@@ -63,8 +67,10 @@ int gen_rerr(u_int32_t brk_dst_ip) {
 #ifdef DTN
 					//if there is DTN register,current node will be the
 					//last DTN hop near the brk node
-					extern int dtn_register;
-					tmp_rerr->last_avail_ip = NULL;
+
+					//extern int dtn_register;
+					//tmp_rerr->last_avail_ip = NULL;
+					tmp_rerr->last_avail_ip = 0;
 
 					tmp_rerr->src_ip = tmp_route->src_ip;
 					if(dtn_register==1)
@@ -72,10 +78,10 @@ int gen_rerr(u_int32_t brk_dst_ip) {
 						tmp_rerr->last_avail_ip = g_mesh_ip;
 			        //printk("last_avail_ip:%s\n",inet_ntoa(tmp_rerr->last_avail_ip));
 						//notice DTN layer
-#include <linux/sched.h>
+
 //JL: Added kernel threads interface:
-#include <linux/kthread.h>
-						u_int32_t para[4];
+
+						//u_int32_t para[4];
 						para[0] = tmp_rerr->src_ip;
 						para[1] = tmp_rerr->dst_ip;
 						para[2] = tmp_rerr->last_avail_ip;
@@ -86,16 +92,17 @@ int gen_rerr(u_int32_t brk_dst_ip) {
 						send2dtn((void*)para,DTNPORT);
 
 					}
-					else tmp_rerr->last_avail_ip = NULL;
+					//else tmp_rerr->last_avail_ip = NULL;
+else tmp_rerr->last_avail_ip = 0;
 #endif
 
 #ifdef CaiDebug
 					//cai:test gen rerr
 	char local[20];
- 	strcpy(local,inet_ntoa(g_mesh_ip));
 	char brk[20];
-strcpy(brk,inet_ntoa(brk_dst_ip));
 	char last[20];
+ 	strcpy(local,inet_ntoa(g_mesh_ip));
+strcpy(brk,inet_ntoa(brk_dst_ip));
 strcpy(last,inet_ntoa(tmp_route->last_hop));
 
 	printk("rerr src is %s,brk_dst_ip is %s,the last hop is %s\n",local,brk,last);
@@ -110,8 +117,8 @@ strcpy(last,inet_ntoa(tmp_route->last_hop));
                         �½�һ��brk_list����Ŀ
                     *****************************************************/
 
-                    brk_link *tmp_link;
-                    u_int32_t lastavail=NULL;
+                    lastavail=0;
+                  //  u_int32_t lastavail=0;
 #ifdef DTN
                     if(dtn_register==1)
                     {
@@ -158,15 +165,15 @@ strcpy(last,inet_ntoa(tmp_route->last_hop));
 					//last DTN hop near the brk node
 					extern int dtn_register;
 					u_int32_t last_avail;//put them out of #ifdef DTN or in is a Q 
-					last_avail = NULL;
+					last_avail = (u_int32_t)NULL;
 					if(dtn_register==1)
 					{
 						last_avail = g_mesh_ip;
 						//notice DTN layer
-#include <linux/sched.h>
+
 //JL: Added kernel threads interface:
-#include <linux/kthread.h>
-						u_int32_t para[4];
+
+						//u_int32_t para[4];
 						para[0] = tmp_route->src_ip;
 						para[1] = tmp_route->dst_ip;
 						para[2] = last_avail;
@@ -178,7 +185,7 @@ strcpy(last,inet_ntoa(tmp_route->last_hop));
 
 					}
 #endif
-				brk_link *tmp_link;
+			//	brk_link'\0' *tmp_link;
 				tmp_link = find_brk_link(tmp_route->src_ip,tmp_route->dst_ip);
 				if(tmp_link != NULL){
 					tmp_link->lifetime = getcurrtime() + BRK_LINK_TIMEOUT;
@@ -186,7 +193,7 @@ strcpy(last,inet_ntoa(tmp_route->last_hop));
 				}
 				else{
 				tmp_link = create_brk_link(tmp_route->src_ip,tmp_route->dst_ip,
-								NULL,last_avail);//notice the last hop is NULL
+								(u_int32_t)NULL,last_avail);//notice the last hop is NULL
 				if(tmp_link==NULL) printk("Creat new brk link failed!\n");
 #ifdef CaiDebug
 char s[20];
@@ -231,11 +238,14 @@ printk("new brk link %s:%s:%s:%s\n",s,d,l,la);
 
 
 int recv_rerr(task * tmp_packet) {
+	brk_link *tmp_link;
 	aodv_route *tmp_route;
 	rerr *tmp_rerr;
 	int num_hops;
 	int expired_routes = 0;
-
+extern int dtn_register;
+	int first_dtn=0;
+	
 	tmp_rerr = (rerr *) tmp_packet->data;
 	num_hops = tmp_rerr->num_hops+1;
 
@@ -245,13 +255,11 @@ int recv_rerr(task * tmp_packet) {
 
 #ifdef DTN
 
-	extern int dtn_register;
-	int first_dtn=0;
+	
 
-#include <linux/sched.h>
 //JL: Added kernel threads interface:
-#include <linux/kthread.h>
-	u_int32_t para[4];
+
+	//u_int32_t para[4];
 	para[0] = tmp_rerr->src_ip;
 	para[1] = tmp_rerr->dst_ip;
 	para[2] = tmp_rerr->last_avail_ip;
@@ -259,7 +267,7 @@ int recv_rerr(task * tmp_packet) {
 
 	if( dtn_register==1 ){
 	    //����ע��DTN����lastavailΪ�ջ��߽��յ���tmp_rerr��СС�ڶ�����DTN��rerr
-		if( para[2]==NULL )//current node is the nearest DTN node to brk link
+		if( para[2]==(u_int32_t)NULL )//current node is the nearest DTN node to brk link
 		{
 			para[2] = g_mesh_ip;
 			first_dtn = 1;
@@ -306,10 +314,10 @@ int recv_rerr(task * tmp_packet) {
                         ������·��������ÿ������һ���µ�rerr��ʱ��Ҳ
                         �½�һ��brk_list����Ŀ
                     *****************************************************/
-                    brk_link *tmp_link;
+                //    brk_link *tmp_link;
 
                     tmp_link = find_brk_link(tmp_route->src_ip,tmp_route->dst_ip);
-                    if(tmp_link != NULL){//�Ѵ��ڣ������������ڣ������������ٳ���
+                    if(tmp_link != 0){//�Ѵ��ڣ������������ڣ������������ٳ���
                         //Update brk_link timelife������Ҫ��ʱ���Ĵ���
                         tmp_link->lifetime = getcurrtime() + BRK_LINK_TIMEOUT;
                         flush_brk_list();
@@ -352,13 +360,13 @@ int recv_rerr(task * tmp_packet) {
 #ifdef DTN
 		    
 			u_int32_t last_avail;
-			last_avail = NULL;
+			last_avail = (u_int32_t)NULL;
 			if(dtn_register==1 && first_dtn==1)
 			{	
 				last_avail = g_mesh_ip;
 			}
 #endif
-                    brk_link *tmp_link;
+                  //  brk_link *tmp_link;
 
                     tmp_link = find_brk_link(tmp_route->src_ip,tmp_route->dst_ip);
                     if(tmp_link != NULL){//�Ѵ��ڣ������������ڣ������������ٳ���
@@ -369,7 +377,7 @@ int recv_rerr(task * tmp_packet) {
                     }
                     else{
                         tmp_link = create_brk_link(tmp_route->src_ip,tmp_route->dst_ip,
-                                               NULL,last_avail);//notice the last hop is NULL
+                                               (u_int32_t)NULL,(u_int32_t)last_avail);//notice the last hop is NULL
 
                         if(tmp_link==NULL) printk("Creat new brk link failed!\n");
 #ifdef CaiDebug

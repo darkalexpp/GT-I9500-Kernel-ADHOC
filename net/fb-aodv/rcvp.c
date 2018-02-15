@@ -7,6 +7,8 @@
  ***************************************************************************/
 //#ifdef RECOVERYPATH
 #include "rcvp.h"
+#include <linux/sched.h>
+#include <linux/kthread.h>
 
 //manage the recovery path packet
 //处理通路包，产生通路包，接收到通路包，转发，通知DTN层
@@ -19,7 +21,7 @@ extern u_int8_t g_routing_metric;
 
 //genarate recovery path packe
 int gen_rcvp(u_int32_t dst_ip){
-
+    extern int dtn_register;
 #ifdef CaiDebug
     char dst[20];
     strcpy(dst,inet_ntoa(dst_ip));
@@ -59,14 +61,14 @@ int gen_rcvp(u_int32_t dst_ip){
                 tmp_rcvp->num_hops = 0;
 
 #ifdef DTN
-                extern int dtn_register;
+            
                // printk("dtn_register=%d;last_hop:%s\n",dtn_register,inet_ntoa(tmp_link->last_hop));
                 if(dtn_register==1)
                 {
                     //notice DTN layer未写接口
-#include <linux/sched.h>
+
 //JL: Added kernel threads interface:
-#include <linux/kthread.h>
+
                     u_int32_t para[4];
                     para[0] = tmp_rcvp->src_ip;
                     para[1] = tmp_rcvp->dst_ip;
@@ -92,9 +94,9 @@ int gen_rcvp(u_int32_t dst_ip){
                 if(dtn_register==1)
                 {
 
-#include <linux/sched.h>
+
 //JL: Added kernel threads interface:
-#include <linux/kthread.h>
+
                     u_int32_t para[4];
                     para[0] = tmp_link->src_ip;
                     para[1] = dst_ip;
@@ -122,7 +124,7 @@ int gen_rcvp(u_int32_t dst_ip){
 
 
 int recv_rcvp(task *tmp_packet){
-
+ extern int dtn_register;
     brk_link *tmp_link;
     rcvp *tmp_rcvp;
     rcvp *new_rcvp;
@@ -138,14 +140,14 @@ int recv_rcvp(task *tmp_packet){
 #ifdef DTN
 
     //添加与DTN交互部分
-                extern int dtn_register;
+               
                 //printk("dtn_register=%d;last_avail:%s\n",dtn_register,inet_ntoa(tmp_rcvp->last_avail_ip));
                 if(dtn_register==1)
                 {
                     //notice DTN layer未写接口
-#include <linux/sched.h>
+
 //JL: Added kernel threads interface:
-#include <linux/kthread.h>
+
                     u_int32_t para[4];
                     para[0] = tmp_rcvp->src_ip;
                     para[1] = tmp_rcvp->dst_ip;
@@ -296,14 +298,13 @@ int recv_rrdp(task *tmp_packet){
 
 			extern int dtn_register;
 
-#include <linux/sched.h>
 //JL: Added kernel threads interface:
-#include <linux/kthread.h>
+
 			if( dtn_register==1 ){
 				u_int32_t para[4];
 				para[0] = tmp_rrdp->src_ip;
 				para[1] = tmp_rrdp->dst_ip;
-				para[2] = NULL;
+				para[2] = (u_int32_t)NULL;
 				para[3] = (u_int32_t)tmp_rrdp->type;
 				send2dtn((void*)para,DTNPORT);
 #ifdef CaiDebug

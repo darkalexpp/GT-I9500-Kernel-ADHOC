@@ -306,7 +306,8 @@ aodv_route *create_aodv_route(u_int32_t src_ip, u_int32_t dst_ip,
 		return NULL;
 	}
 	tmp_entry->dst_ip = dst_ip;
-	tmp_entry->next_hop = NULL;
+//tmp_entry->next_hop =0;
+	tmp_entry->next_hop =0;
 	tmp_entry->src_ip = src_ip;
 	tmp_entry->tos = tos;
 	tmp_entry->dst_id = dst_id;

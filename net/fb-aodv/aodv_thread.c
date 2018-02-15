@@ -49,6 +49,7 @@ void kill_aodv() {
 void aodv(void) {
 	//The queue holding all the events to be dealt with
 	task *tmp_task;
+extern int dtn_hello_ip;
 
 	//Initalize the variables
 	init_waitqueue_head(&aodv_wait);
@@ -81,10 +82,9 @@ void aodv(void) {
 			goto exit;
 		}
 		//While the buffer is not empty
-		extern dtn_hello_ip;
 		while ((tmp_task = get_task()) != NULL) {
 			
-			u_int32_t dst;
+			__attribute__((unused))u_int32_t dst;
 
 			//takes a different action depending on what type of event is recieved
 			switch (tmp_task->type) {

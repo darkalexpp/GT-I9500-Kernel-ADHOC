@@ -22,12 +22,18 @@ void convert_rrep_to_network(rrep * tmp_rrep) {
 }
 
 int recv_rrep(task * tmp_packet) {
+			brk_link *tmp_link;
 	aodv_route *send_route;
 	aodv_route *recv_route;
 	aodv_neigh *tmp_neigh = NULL;
 	rrep *tmp_rrep;
 	u_int32_t path_metric;
 	int iam_destination = 0;
+	
+		extern u_int32_t dtn_hello_ip;
+				extern int dtn_register;
+			aodv_route *new_recv;
+		aodv_route __attribute__((unused))*new_send;
 #ifdef DEBUG
 	char dst_ip[16];
 	char src_ip[16];
@@ -98,7 +104,7 @@ int recv_rrep(task * tmp_packet) {
 		send_route->last_hop = g_mesh_ip;
 
 #ifdef DTN_HELLO
-		if(tmp_rrep->dttl!=NULL && tmp_rrep->dttl>0){//I'm the src of dtn hello,& notice DTN the neighbor node
+		if(tmp_rrep->dttl!=(u_int32_t)NULL && tmp_rrep->dttl>0){//I'm the src of dtn hello,& notice DTN the neighbor node
 			u_int32_t para[4];
 			
 			//leave a interface to query DTN about its geographical info
@@ -108,7 +114,7 @@ int recv_rrep(task * tmp_packet) {
 			para[2] = tmp_rrep->y;
 			
 			//类型处理
-			para[3] = NULL;
+			para[3] = (u_int32_t)NULL;
 			//
 			send2dtn((void*)para,RE_DTN_HELLO);
 #ifdef DEBUG0
@@ -134,11 +140,12 @@ int recv_rrep(task * tmp_packet) {
 #ifdef CaiDebug
 char s[20];
 char d[20];
+
 strcpy(s,inet_ntoa(tmp_rrep->src_ip));
 strcpy(d,inet_ntoa(tmp_rrep->dst_ip));
         printk("The tmp_rrep's src is %s,dst is %s\n",s,d);
 #endif
-		brk_link *tmp_link;
+		
 		tmp_link = find_first_brk_link_with_dst(tmp_rrep->dst_ip);//rreq的源则为路由发现的目的地，也为断路表的目的地址
 		if(tmp_link==NULL){   
 #ifdef CaiDebug
@@ -161,12 +168,9 @@ printk("no brk links to this dst\n");
 
 #ifdef DTN
 #ifdef DTN_HELLO
-		extern u_int32_t dtn_hello_ip;
-		extern dtn_register;
-		aodv_route *new_recv;
-		aodv_route *new_send;
 
-		if( (tmp_rrep->dttl!=NULL) && (tmp_rrep->dttl>0) ){
+
+		if( (tmp_rrep->dttl!=(u_int32_t)NULL) && (tmp_rrep->dttl>0) ){
 			//it's a DTN hello rrep
 			recv_route = find_aodv_route(dtn_hello_ip,tmp_rrep->src_ip,tmp_rrep->tos);
 			if(recv_route){
@@ -269,6 +273,13 @@ int gen_rrep(u_int32_t src_ip, u_int32_t dst_ip, unsigned char tos) {
 	aodv_route *src_route;
 	rrep *tmp_rrep;
 
+	extern int dtn_register;
+	extern u_int32_t dtn_hello_ip;
+	extern u_int32_t longitude;
+	extern u_int32_t latitude;
+	u_int32_t new_dst_ip;
+	u_int8_t dttl=0;
+	aodv_route *new_route;
 #ifdef DEBUG0
 	char src[16];
 	char dst[16];
@@ -299,15 +310,8 @@ int gen_rrep(u_int32_t src_ip, u_int32_t dst_ip, unsigned char tos) {
 
 //it's a dtn neighbor,gen "special rrep" for telling src
 #ifdef DTN_HELLO
-	extern int dtn_register;
-	extern u_int32_t dtn_hello_ip;
-	extern u_int32_t longitude;
-	extern u_int32_t latitude;
 	//u_int32_t x;
 	//u_int32_t y;
-	u_int32_t new_dst_ip;
-	u_int8_t dttl=0;
-	aodv_route *new_route;
 	if(dtn_register){
 #ifdef CaiDebug
 		printk("The src ip is %s\n",inet_ntoa(src_ip));
@@ -326,7 +330,7 @@ int gen_rrep(u_int32_t src_ip, u_int32_t dst_ip, unsigned char tos) {
 
 			if(new_route==NULL) return 0;
 			new_route->next_hop = src_route->next_hop;
-			new_route->last_hop = NULL;
+			new_route->last_hop = (u_int32_t)NULL;
 			//update the src_route's lifetime
 			//src_route->lifetime = getcurrtime() + DELETE_PERIOD;
 			//let the new_route be the src_route,&create rrep route
