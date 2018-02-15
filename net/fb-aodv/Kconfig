@@ -3,7 +3,15 @@
 #
 
 config FB_AODV
-	tristate "FB-aodv"
+	tristate "fb-aodv"
 	#depends on NET
 	#EXTRA_CFLAGS += -DNOMIPS -fno-pic
-        default y
+        default m
+	---help---
+
+	Flow-Based AODV (FB-AODV) routing protocol with Weighted 
+	Contention and Interference routing Metric (WCIM)
+	Miguel Catalán Cid
+	In FB-AODV, routes are based on flows. Each unique flow is 
+	determined by a source, a destination and a ToS. The available ToS 
+	are defined and can be modified in tos.c. 

@@ -12,26 +12,26 @@
 
 struct timer_list aodv_timer;
 
-//rwlock_t timer_lock = RW_LOCK_UNLOCKED;
-DEFINE_RWLOCK(timer_lock);
+//rwlock_t xtimer_lock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(xtimer_lock);
 
 task *timer_queue;
 unsigned long flags;
 
 inline void timer_read_lock(void) {
-	read_lock_irqsave(&timer_lock, flags);
+	read_lock_irqsave(&xtimer_lock, flags);
 }
 
 inline void timer_read_unlock(void) {
-	read_unlock_irqrestore(&timer_lock, flags);
+	read_unlock_irqrestore(&xtimer_lock, flags);
 }
 
 inline void timer_write_lock(void) {
-	write_lock_irqsave(&timer_lock, flags);
+	write_lock_irqsave(&xtimer_lock, flags);
 }
 
 inline void timer_write_unlock(void) {
-	write_unlock_irqrestore(&timer_lock, flags);
+	write_unlock_irqrestore(&xtimer_lock, flags);
 }
 
 int init_timer_queue() {
