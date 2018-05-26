@@ -230,7 +230,6 @@ source "net/dcb/Kconfig"
 source "net/dns_resolver/Kconfig"
 source "net/batman-adv/Kconfig"
 source "net/openvswitch/Kconfig"
-source "net/fb-aodv/Kconfig"
 
 config RPS
 	boolean "RPS"

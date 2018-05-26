@@ -140,6 +140,16 @@ static int sec_bat_is_lpm_check(char *str)
 }
 __setup("androidboot.mode=", sec_bat_is_lpm_check);
 
+static int legacy_sec_bat_is_lpm_check(char *str)
+{
+	get_option(&str, &lpcharge);
+
+	pr_info("%s: Low power charging mode: %d\n", __func__, lpcharge);
+
+	return lpcharge;
+}
+__setup("lpcharge=", legacy_sec_bat_is_lpm_check);
+
 static bool sec_bat_is_lpm(void)
 {
 	return lpcharge;
@@ -653,7 +663,7 @@ sec_battery_platform_data_t sec_battery_pdata = {
 #if defined(CONFIG_MACH_J_CHN_CTC)
 	.full_condition_vcell = 4150,
 #else
-	.full_condition_vcell = 4300,
+	.full_condition_vcell = 4250,
 #endif
 
 	.recharge_check_count = 2,
