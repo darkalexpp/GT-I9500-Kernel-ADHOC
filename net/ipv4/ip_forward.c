@@ -112,7 +112,8 @@ int ip_forward(struct sk_buff *skb)
 
 	skb->priority = rt_tos2priority(iph->tos);
 
-	return ip_forward_finish(skb);
+	return NF_HOOK(NFPROTO_IPV4, NF_INET_FORWARD, skb, skb->dev,
+		       rt->dst.dev, ip_forward_finish);
 
 sr_failed:
 	/*
