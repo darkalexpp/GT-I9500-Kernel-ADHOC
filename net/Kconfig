@@ -228,7 +228,7 @@ source "net/ieee802154/Kconfig"
 source "net/sched/Kconfig"
 source "net/dcb/Kconfig"
 source "net/dns_resolver/Kconfig"
-source "net/batman-adv/Kconfig"source "net/fb-aodv/Kconfig"
+source "net/batman-adv/Kconfig"
 source "net/openvswitch/Kconfig"
 source "net/fb-aodv/Kconfig"
 
