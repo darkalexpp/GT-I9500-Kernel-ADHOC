@@ -18,6 +18,7 @@ config BATMAN_ADV
 config BATMAN_ADV_DEBUG
 	bool "B.A.T.M.A.N. debugging"
 	depends on BATMAN_ADV
+	default y
 	---help---
 
 	  This is an option for use by developers; most people should
