@@ -28,7 +28,7 @@ config WAKELOCK
 
 config POWERSUSPEND
 	bool "Power suspend"
-	default n
+	default y
 	---help---
 	  Call early suspend handlers when the user requested sleep state
 	  changes.
@@ -302,3 +302,4 @@ config PM_SYNC_BEFORE_SUSPEND
 	bool "Sync file systems before suspend"
 	depends on PM
 	default n
+
