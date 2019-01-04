@@ -22,7 +22,10 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/shrinker.h>
+#include <linux/swap.h>
 #include "ion_priv.h"
+
+#include <linux/swap.h>
 
 /* #define DEBUG_PAGE_POOL_SHRINKER */
 
@@ -203,7 +206,9 @@ static int ion_page_pool_shrink(struct shrinker *shrinker,
 	bool high;
 	int nr_to_scan = sc->nr_to_scan;
 
-	if (sc->gfp_mask & __GFP_HIGHMEM)
+	high = sc->gfp_mask & __GFP_HIGHMEM;
+
+	if (current_is_kswapd())
 		high = true;
 
 	if (nr_to_scan == 0)

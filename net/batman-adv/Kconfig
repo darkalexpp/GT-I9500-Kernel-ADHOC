@@ -6,7 +6,7 @@ config BATMAN_ADV
 	tristate "B.A.T.M.A.N. Advanced Meshing Protocol"
 	depends on NET
 	select CRC16
-        default y
+        default n
 	---help---
 
         B.A.T.M.A.N. (better approach to mobile ad-hoc networking) is
@@ -17,8 +17,7 @@ config BATMAN_ADV
 
 config BATMAN_ADV_DEBUG
 	bool "B.A.T.M.A.N. debugging"
-	depends on BATMAN_ADV
-	default y
+	depends on BATMAN_ADV != n
 	---help---
 
 	  This is an option for use by developers; most people should

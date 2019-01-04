@@ -66,8 +66,8 @@ static struct exynos_devfreq_platdata universal5410_qos_int_pd __initdata = {
 
 #ifdef CONFIG_ARM_EXYNOS_IKS_CPUFREQ
 static struct exynos_tmu_platform_data exynos5_tmu_data = {
-	.trigger_levels[0] = 90,
-	.trigger_levels[1] = 95,
+	.trigger_levels[0] = 80,
+	.trigger_levels[1] = 85,
 	.trigger_levels[2] = 110,
 	.trigger_levels[3] = 115,
 	.boost_trigger_levels[0] = 100,
@@ -85,11 +85,11 @@ static struct exynos_tmu_platform_data exynos5_tmu_data = {
 	.efuse_value = 55,
 	.freq_tab[0] = {
 		.freq_clip_max = 1400 * 1000,
-		.temp_level = 90,
+		.temp_level = 80,
 	},
 	.freq_tab[1] = {
 		.freq_clip_max = 1000 * 1000,
-		.temp_level = 95,
+		.temp_level = 85,
 	},
 	.freq_tab[2] = {
 		.freq_clip_max = 600 * 1000,
@@ -204,4 +204,33 @@ void __init exynos5_universal5410_power_init(void)
 	exynos_set_sleep_gpio_table = sec_config_sleep_gpio_table;
 	exynos_debug_show_gpio = sec_debug_show_gpio;
 #endif
+}
+
+int cpufreq_stats_platform_cpu_power_read_tables(int cpunum, u32 *out_values, size_t num)
+{
+	static const u32 powerVals[] = {35000, 45000, 60000, 75000, 94000, 118000, 146000, 182000, 387000, 455000, 571000, 704000, 841000, 1043000, 1293000, 1619000, 1860000};
+	static const u32 cpuWeights[4] = {16384, 6717, 7700, 8847};
+	int i, numVals = sizeof(powerVals) / sizeof(*powerVals), numCpus = sizeof(cpuWeights) / sizeof(*cpuWeights);
+
+	/*
+	 * Our data source (power_profile.xml) only gives us values for 1st core,
+	 * and not per core as requested, so we weigh these. With weights: 100%, 54%.
+    * This is the same thing as what hammerhead does (for 1st and last core), for
+	 * better or worse.
+	 */
+
+	if (num > numVals) {
+		pr_err("cpufreq_stats_platform_cpu_power_read_tables asked for too many values (wanted %u have %u)\n", (int)num, numVals);
+		return -1;
+	}
+
+	if (cpunum > numCpus) {
+		pr_err("cpufreq_stats_platform_cpu_power_read_tables asked for too many CPUs (wanted %u have %u)\n", cpunum, numCpus);
+		return -2;
+	}
+
+	for (i = 0; i < num; i++)
+		*out_values++ = powerVals[i] * cpuWeights[cpunum] >> 14;
+
+	return 0;
 }

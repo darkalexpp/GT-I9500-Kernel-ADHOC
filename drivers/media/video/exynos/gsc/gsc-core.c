@@ -368,7 +368,7 @@ void gsc_set_prefbuf(struct gsc_dev *gsc, struct gsc_frame frm)
 		s_chk_addr = frm.addr.cb;
 		s_chk_len = frm.payload[1];
 	} else if (frm.fmt->num_planes == 3) {
-		u32 low_addr, low_plane, mid_addr, mid_plane, high_addr, high_plane;
+		u32 low_addr, low_plane = 0, mid_addr, mid_plane, high_addr, high_plane = 0;
 		u32 t_min, t_max;
 
 		t_min = min3(frm.addr.y, frm.addr.cb, frm.addr.cr);
@@ -636,8 +636,8 @@ int gsc_check_scaler_ratio(struct gsc_variant *var, int sw, int sh, int dw,
 		tmp_h = dh;
 	}
 
-	if ((sw > (tmp_w * sc_down_max)) ||
-	    (sh > (tmp_h * sc_down_max)) ||
+	if ((sw >= (tmp_w * sc_down_max)) ||
+	    (sh >= (tmp_h * sc_down_max)) ||
 	    (tmp_w > (sw * var->sc_up_max)) ||
 	    (tmp_h > (sh * var->sc_up_max)))
 		return -EINVAL;

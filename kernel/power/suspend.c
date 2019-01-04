@@ -24,16 +24,11 @@
 #include <linux/export.h>
 #include <linux/suspend.h>
 #include <linux/syscore_ops.h>
+#include <linux/ftrace.h>
 #include <linux/rtc.h>
 #include <trace/events/power.h>
 
 #include "power.h"
-
-#ifdef CONFIG_PM_SYNC_BEFORE_SUSPEND
-static int suspendsync = 1;
-#else
-static int suspendsync;
-#endif
 
 const char *const pm_states[PM_SUSPEND_MAX] = {
 	[PM_SUSPEND_STANDBY]	= "standby",
@@ -177,6 +172,8 @@ static int suspend_enter(suspend_state_t state, bool *wakeup)
 		if (!(suspend_test(TEST_CORE) || *wakeup)) {
 			error = suspend_ops->enter(state);
 			events_check_enabled = false;
+		} else if (*wakeup) {
+			error = -EBUSY;
 		}
 		syscore_resume();
 	}
@@ -219,7 +216,7 @@ int suspend_devices_and_enter(suspend_state_t state)
 			goto Close;
 	}
 	suspend_console();
-ftrace_stop();
+	ftrace_stop();
 	suspend_test_start();
 	error = dpm_suspend_start(PMSG_SUSPEND);
 	if (error) {
@@ -239,7 +236,7 @@ ftrace_stop();
 	suspend_test_start();
 	dpm_resume_end(PMSG_RESUME);
 	suspend_test_finish("resume devices");
-ftrace_start();
+	ftrace_start();
 	resume_console();
  Close:
 	if (suspend_ops->end)
@@ -347,10 +344,3 @@ int pm_suspend(suspend_state_t state)
 	return error;
 }
 EXPORT_SYMBOL(pm_suspend);
-
-static int __init suspendsync_setup(char *str)
-{
-	suspendsync = simple_strtoul(str, NULL, 0);
-	return 1;
-}
-__setup("suspendsync=", suspendsync_setup);

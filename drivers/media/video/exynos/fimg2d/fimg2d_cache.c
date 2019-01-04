@@ -132,7 +132,7 @@ void fimg2d_clean_outer_pagetable(struct mm_struct *mm, unsigned long vaddr,
 #endif /* CONFIG_OUTER_CACHE */
 
 enum pt_status fimg2d_check_pagetable(struct mm_struct *mm,
-		unsigned long vaddr, size_t size)
+		unsigned long vaddr, size_t size, int write)
 {
 	unsigned long *pgd;
 	unsigned long *lv1d, *lv2d;
@@ -153,14 +153,55 @@ enum pt_status fimg2d_check_pagetable(struct mm_struct *mm,
 		 *	lv1 desc[1:0] = 11 --> reserved
 		 */
 		if ((*lv1d & LV1_DESC_MASK) != 0x1) {
-			fimg2d_debug("invalid LV1 descriptor, "
+			struct vm_area_struct *vma;
+
+			vma = find_vma(mm, vaddr);
+			if (!vma) {
+				pr_err("%s: vma is null\n", __func__);
+				return PT_FAULT;
+			}
+
+			if (vma->vm_end < (vaddr + size)) {
+				pr_err("%s: vma overflow: %#lx--%#lx, "
+						"vaddr: %#lx, size: %zd\n",
+						__func__, vma->vm_start,
+						vma->vm_end, vaddr, size);
+				return PT_FAULT;
+			}
+
+			handle_mm_fault(mm, vma, vaddr,
+					write ? FAULT_FLAG_WRITE : 0);
+
+			if ((*lv1d & LV1_DESC_MASK) != 0x1) {
+				fimg2d_debug("invalid LV1 descriptor, "
 					"pgd %p lv1d 0x%lx vaddr 0x%lx\n",
 					pgd, *lv1d, vaddr);
-			return PT_FAULT;
+				return PT_FAULT;
+			}
 		}
 
 		lv2d = (unsigned long *)phys_to_virt(*lv1d & ~LV2_BASE_MASK) +
 				((vaddr & LV2_PT_MASK) >> LV2_SHIFT);
+
+		if (write && (!pte_present(*lv2d) || !pte_write(*lv2d))) {
+			struct vm_area_struct *vma;
+
+			vma = find_vma(mm, vaddr);
+			if (!vma) {
+				pr_err("%s: vma is null\n", __func__);
+				return PT_FAULT;
+			}
+
+			if (vma->vm_end < (vaddr + size)) {
+				pr_err("%s: vma overflow: %#lx--%#lx, "
+						"vaddr: %#lx, size: %zd\n",
+						__func__, vma->vm_start,
+						vma->vm_end, vaddr, size);
+				return PT_FAULT;
+			}
+
+			handle_mm_fault(mm, vma, vaddr, FAULT_FLAG_WRITE);
+		}
 
 		/*
 		 * check level 2 descriptor

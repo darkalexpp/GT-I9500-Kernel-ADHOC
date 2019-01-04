@@ -28,6 +28,40 @@
 #endif
 #include "synaptics_i2c_rmi.h"
 
+static unsigned int TOUCH_BOOSTER_CHG_TIME = 200;
+static unsigned int TOUCH_BOOSTER_CHG_TIME_9 = 500;
+
+static unsigned int TOUCH_BOOSTER_OFF_TIME = 300;
+static unsigned int TOUCH_BOOSTER_OFF_TIME_9 = 1000;
+
+static unsigned int TOUCH_BOOSTER_CPU_FRQ_1 = 600000;
+static unsigned int TOUCH_BOOSTER_CPU_FRQ_9 = 1600000;
+static unsigned int TOUCH_BOOSTER_CPU_FRQ_9_T = 1200000;
+
+static unsigned int TOUCH_BOOSTER_MIF_FRQ_1 = 800000;
+static unsigned int TOUCH_BOOSTER_MIF_FRQ_2 = 400000;
+static unsigned int TOUCH_BOOSTER_MIF_FRQ_9 = 800000;
+
+static unsigned int TOUCH_BOOSTER_INT_FRQ_1 = 200000;
+static unsigned int TOUCH_BOOSTER_INT_FRQ_9 = 400000;
+
+module_param_named(qos_cpu_freq_1, TOUCH_BOOSTER_CPU_FRQ_1, uint, S_IWUSR | S_IRUGO);
+module_param_named(qos_cpu_freq_9_0, TOUCH_BOOSTER_CPU_FRQ_9, uint, S_IWUSR | S_IRUGO);
+module_param_named(qos_cpu_freq_9_1, TOUCH_BOOSTER_CPU_FRQ_9_T, uint, S_IWUSR | S_IRUGO);
+
+module_param_named(qos_mif_freq_1, TOUCH_BOOSTER_MIF_FRQ_1, uint, S_IWUSR | S_IRUGO);
+module_param_named(qos_mif_freq_2, TOUCH_BOOSTER_MIF_FRQ_2, uint, S_IWUSR | S_IRUGO);
+module_param_named(qos_mif_freq_9, TOUCH_BOOSTER_MIF_FRQ_9, uint, S_IWUSR | S_IRUGO);
+
+module_param_named(qos_int_freq_1, TOUCH_BOOSTER_INT_FRQ_1, uint, S_IWUSR | S_IRUGO);
+module_param_named(qos_int_freq_9, TOUCH_BOOSTER_INT_FRQ_9, uint, S_IWUSR | S_IRUGO);
+
+module_param_named(qos_off_time_1, TOUCH_BOOSTER_OFF_TIME, uint, S_IWUSR | S_IRUGO);
+module_param_named(qos_off_time_9, TOUCH_BOOSTER_OFF_TIME_9, uint, S_IWUSR | S_IRUGO);
+
+module_param_named(qos_charge_time_1, TOUCH_BOOSTER_CHG_TIME, uint, S_IWUSR | S_IRUGO);
+module_param_named(qos_charge_time_9, TOUCH_BOOSTER_CHG_TIME_9, uint, S_IWUSR | S_IRUGO);
+
 #define DRIVER_NAME "synaptics_rmi4_i2c"
 
 #define PROXIMITY
@@ -92,8 +126,6 @@
 #define EDGE_SWIPE_DATA_OFFSET	8
 
 #define EDGE_SWIPE_WIDTH_MAX	255
-#define EDGE_SWIPE_ANGLE_MIN	(-90)
-#define EDGE_SWIPE_ANGLE_MAX	90
 #define EDGE_SWIPE_PALM_MAX		1
 #endif
 #define F51_FINGER_TIMEOUT 50 /* ms */
@@ -1092,15 +1124,15 @@ static int synaptics_rmi4_i2c_write(struct synaptics_rmi4_data *rmi4_data,
 {
 	int retval;
 	unsigned char retry;
-	unsigned char buf[length + 1];
-	struct i2c_msg msg[] = {
-		{
-			.addr = rmi4_data->i2c_client->addr,
-			.flags = 0,
-			.len = length + 1,
-			.buf = buf,
-		}
-	};
+	unsigned char *buf;
+	struct i2c_msg msg[1];
+	buf = kzalloc(length + 1, GFP_KERNEL);
+	if (!buf) {
+		dev_err(&rmi4_data->i2c_client->dev, 
+			"%s: Failed to alloc mem for buffer\n",
+			__func__);
+		return -ENOMEM;
+	}
 
 	mutex_lock(&(rmi4_data->rmi4_io_ctrl_mutex));
 
@@ -1110,6 +1142,11 @@ static int synaptics_rmi4_i2c_write(struct synaptics_rmi4_data *rmi4_data,
 		retval = 0;
 		goto exit;
 	}
+
+	msg[0].addr = rmi4_data->i2c_client->addr;
+	msg[0].flags = 0;
+	msg[0].len = length + 1;
+	msg[0].buf = buf;
 
 	retval = synaptics_rmi4_set_page(rmi4_data, addr);
 	if (retval != PAGE_SELECT_LEN)
@@ -1138,6 +1175,7 @@ static int synaptics_rmi4_i2c_write(struct synaptics_rmi4_data *rmi4_data,
 
 exit:
 	mutex_unlock(&(rmi4_data->rmi4_io_ctrl_mutex));
+	kfree(buf);
 
 	return retval;
 }
@@ -1464,8 +1502,6 @@ static int synaptics_rmi4_f12_abs_report(struct synaptics_rmi4_data *rmi4_data,
 				if (f51->proximity_controls & HAS_EDGE_SWIPE) {
 					input_report_abs(rmi4_data->input_dev,
 							ABS_MT_WIDTH_MAJOR, f51->surface_data.width_major);
-					input_report_abs(rmi4_data->input_dev,
-							ABS_MT_ANGLE, f51->surface_data.angle);
 					input_report_abs(rmi4_data->input_dev,
 							ABS_MT_PALM, f51->surface_data.palm);
 				}
@@ -3291,9 +3327,6 @@ static int synaptics_rmi4_set_input_device
 	input_set_abs_params(rmi4_data->input_dev,
 			ABS_MT_WIDTH_MAJOR, 0,
 			EDGE_SWIPE_WIDTH_MAX, 0, 0);
-	input_set_abs_params(rmi4_data->input_dev,
-			ABS_MT_ANGLE, 0,
-			EDGE_SWIPE_ANGLE_MAX, 0, 0);
 	input_set_abs_params(rmi4_data->input_dev,
 			ABS_MT_PALM, 0,
 			EDGE_SWIPE_PALM_MAX, 0, 0);

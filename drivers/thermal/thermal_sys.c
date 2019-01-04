@@ -1177,7 +1177,7 @@ void thermal_zone_device_update(struct thermal_zone_device *tz)
 					pr_info("[TMU] ACTIVE: Need tripping, temp=%ld\n", temp);
 					cdev->ops->set_cur_state(cdev, 1);
 				} else {
-					pr_info("[TMU] ACTIVE: Under active trip temp=%ld\n", temp);
+					pr_debug("[TMU] ACTIVE: Under active trip temp=%ld\n", temp);
 					cdev->ops->set_cur_state(cdev, 0);
 				}
 			}
@@ -1588,6 +1588,7 @@ static int __init thermal_init(void)
 		idr_destroy(&thermal_cdev_idr);
 		mutex_destroy(&thermal_idr_lock);
 		mutex_destroy(&thermal_list_lock);
+		return result;
 	}
 	result = genetlink_init();
 	return result;

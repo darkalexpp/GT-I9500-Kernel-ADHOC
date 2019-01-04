@@ -30,9 +30,6 @@
 #ifdef CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
 #endif
-#ifdef CONFIG_FB
-#include <linux/fb.h>
-#endif
 #include <linux/io.h>
 #include <linux/regulator/consumer.h>
 #include <linux/regulator/driver.h>
@@ -40,6 +37,16 @@
 
 #include "issp_extern.h"
 #include <linux/i2c/touchkey_i2c.h>
+
+static unsigned int qos_cpu_freq = 600000;
+static unsigned int qos_mif_freq = 800000;
+static unsigned int qos_mif2_freq = 400000;
+static unsigned int qos_int_freq = 200000;
+
+module_param(qos_cpu_freq, uint, S_IWUSR | S_IRUGO);
+module_param(qos_mif_freq, uint, S_IWUSR | S_IRUGO);
+module_param(qos_mif2_freq, uint, S_IWUSR | S_IRUGO);
+module_param(qos_int_freq, uint, S_IWUSR | S_IRUGO);
 
 static int touchkey_keycode[] = { 0,
 #if defined(TK_USE_4KEY_TYPE_ATT)
@@ -71,6 +78,7 @@ static u8 touchkey_threshold;
 
 static int touchkey_autocalibration(struct touchkey_i2c *tkey_i2c);
 #endif
+static void cypress_touchkey_interrupt_set_dual(struct i2c_client *client);
 
 static int touchkey_i2c_check(struct touchkey_i2c *tkey_i2c);
 
@@ -95,6 +103,13 @@ static int touchkey_led_status;
 static int touchled_cmd_reversed;
 
 #ifdef LED_LDO_WITH_REGULATOR
+
+#define BL_STANDARD	3000
+#define BL_MIN		2500
+#define BL_MAX		3300
+
+static unsigned int touchkey_voltage_brightness = BL_STANDARD;
+
 static void change_touch_key_led_voltage(int vol_mv)
 {
 	struct regulator *tled_regulator;
@@ -107,6 +122,17 @@ static void change_touch_key_led_voltage(int vol_mv)
 	}
 	regulator_set_voltage(tled_regulator, vol_mv * 1000, vol_mv * 1000);
 	regulator_put(tled_regulator);
+}
+
+void update_touchkey_brightness(unsigned int level)
+{
+	if (level > 0 && level < 256) {
+		printk(KERN_DEBUG "[TouchKey-LED] %s: %d\n", __func__, level);
+		touchkey_voltage_brightness = BL_MIN + ((((level * 100 / 255) * (BL_MAX - BL_MIN)) / 100) / 50) * 50;
+		change_touch_key_led_voltage(touchkey_voltage_brightness);
+	} else {
+		printk(KERN_DEBUG "[TouchKey-LED] %s: Ignoring brightness : %d\n", __func__, level);
+	}
 }
 
 static ssize_t brightness_control(struct device *dev,
@@ -684,7 +710,7 @@ static void touchkey_change_dvfs_lock(struct work_struct *work)
 	mutex_lock(&tkey_i2c->tsk_dvfs_lock);
 
 	if (pm_qos_request_active(&tkey_i2c->tsk_mif_qos)) {
-		pm_qos_update_request(&tkey_i2c->tsk_mif_qos, 400000); /* MIF 400MHz */
+		pm_qos_update_request(&tkey_i2c->tsk_mif_qos, qos_mif2_freq); /* MIF 400MHz */
 		dev_dbg(&tkey_i2c->client->dev, "change_mif_dvfs_lock");
 	}
 
@@ -721,9 +747,9 @@ static void touchkey_set_dvfs_lock(struct touchkey_i2c *tkey_i2c,
 	} else if (on == 1) {
 		cancel_delayed_work(&tkey_i2c->tsk_work_dvfs_off);
 		if (!tkey_i2c->tsk_dvfs_lock_status) {
-			pm_qos_add_request(&tkey_i2c->tsk_cpu_qos, PM_QOS_CPU_FREQ_MIN, 600000); /* CPU KFC 1.2GHz */
-			pm_qos_add_request(&tkey_i2c->tsk_mif_qos, PM_QOS_BUS_THROUGHPUT, 800000); /* MIF 800MHz */
-			pm_qos_add_request(&tkey_i2c->tsk_int_qos, PM_QOS_DEVICE_THROUGHPUT, 200000); /* INT 200MHz */
+			pm_qos_add_request(&tkey_i2c->tsk_cpu_qos, PM_QOS_CPU_FREQ_MIN, qos_cpu_freq); /* CPU KFC 1.2GHz */
+			pm_qos_add_request(&tkey_i2c->tsk_mif_qos, PM_QOS_BUS_THROUGHPUT, qos_mif_freq); /* MIF 800MHz */
+			pm_qos_add_request(&tkey_i2c->tsk_int_qos, PM_QOS_DEVICE_THROUGHPUT, qos_int_freq); /* INT 200MHz */
 
 			schedule_delayed_work(&tkey_i2c->tsk_work_dvfs_chg,
 							msecs_to_jiffies(TOUCH_BOOSTER_CHG_TIME));
@@ -794,6 +820,9 @@ static int touchkey_firmware_version_check(struct touchkey_i2c *tkey_i2c)
 		dev_info(&tkey_i2c->client->dev, "Firmware id 20045\n");
 		tkey_i2c->firmware_id = TK_MODULE_20045;
 	}
+
+	/* CYPRESS Firmware setting interrupt type : dual or single interrupt */
+		cypress_touchkey_interrupt_set_dual(tkey_i2c->client);
 
 	return ret;
 }
@@ -870,10 +899,12 @@ static irqreturn_t touchkey_interrupt(int irq, void *dev_id)
 {
 	struct touchkey_i2c *tkey_i2c = dev_id;
 	u8 data[3];
-	int ret;
+	int ret = 0;
 	int retry = 10;
+	int pressed = 0;
+	int i = 0;
+	int keycode_data[touchkey_count];
 	int keycode_type = 0;
-	int pressed;
 
 	retry = 3;
 	while (retry--) {
@@ -889,24 +920,45 @@ static irqreturn_t touchkey_interrupt(int irq, void *dev_id)
 	if (ret < 0)
 		return IRQ_HANDLED;
 
-	keycode_type = (data[0] & TK_BIT_KEYCODE);
-	pressed = !(data[0] & TK_BIT_PRESS_EV);
+	if (tkey_i2c->firmware_ver > TK_MULTI_FW_VER) {
+		keycode_data[1] = data[0] & 0x3;
+		keycode_data[2] = (data[0] >> 2) & 0x3;
 
-	if (keycode_type <= 0 || keycode_type >= touchkey_count) {
-		dev_dbg(&tkey_i2c->client->dev, "keycode_type err\n");
-		return IRQ_HANDLED;
-	}
-
-	input_report_key(tkey_i2c->input_dev,
-			 touchkey_keycode[keycode_type], pressed);
-	input_sync(tkey_i2c->input_dev);
+		for (i = 1; i < touchkey_count; i++) {
+			if (keycode_data[i]) {
+				input_report_key(tkey_i2c->input_dev, touchkey_keycode[i], (keycode_data[i] % 2));
 #if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
-	dev_info(&tkey_i2c->client->dev, "keycode:%d pressed:%d %d\n",
-	touchkey_keycode[keycode_type], pressed, tkey_i2c->tsk_glove_mode_status);
+				dev_info(&tkey_i2c->client->dev, "keycode: %d %s %d\n", touchkey_keycode[i],
+					(keycode_data[i] % 2) ? "PRESS" : "RELEASE", tkey_i2c->tsk_glove_mode_status);
 #else
-	dev_dbg(&tkey_i2c->client->dev, "pressed:%d %d\n",
-		pressed, tkey_i2c->tsk_glove_mode_status);
+				dev_info(&tkey_i2c->client->dev, " %s %d\n",
+						(keycode_data[i] % 2) ? "PRESS" : "RELEASE", tkey_i2c->tsk_glove_mode_status);
 #endif
+				pressed = keycode_data[i] % 2;
+			}
+		}
+		input_sync(tkey_i2c->input_dev);
+	} else {
+		keycode_type = (data[0] & TK_BIT_KEYCODE);
+		pressed = !(data[0] & TK_BIT_PRESS_EV);
+
+		if (keycode_type <= 0 || keycode_type >= touchkey_count) {
+			dev_dbg(&tkey_i2c->client->dev, "keycode_type err\n");
+			return IRQ_HANDLED;
+		}
+
+		input_report_key(tkey_i2c->input_dev,
+				 touchkey_keycode[keycode_type], pressed);
+		input_sync(tkey_i2c->input_dev);
+#if !defined(CONFIG_SAMSUNG_PRODUCT_SHIP)
+		dev_info(&tkey_i2c->client->dev, "keycode:%d pressed:%d %d\n",
+		touchkey_keycode[keycode_type], pressed, tkey_i2c->tsk_glove_mode_status);
+#else
+		dev_dbg(&tkey_i2c->client->dev, "pressed:%d %d\n",
+			pressed, tkey_i2c->tsk_glove_mode_status);
+#endif
+		}
+
 #ifdef TOUCHKEY_BOOSTER
 	touchkey_set_dvfs_lock(tkey_i2c, !!pressed);
 #endif
@@ -1026,6 +1078,9 @@ static int touchkey_start(struct touchkey_i2c *tkey_i2c)
 
 	tkey_i2c->enabled = true;
 
+	/* CYPRESS Firmware setting interrupt type : dual or single interrupt */
+	cypress_touchkey_interrupt_set_dual(tkey_i2c->client);
+
 #if defined(TK_HAS_AUTOCAL)
 	touchkey_autocalibration(tkey_i2c);
 #endif
@@ -1050,6 +1105,11 @@ static int touchkey_start(struct touchkey_i2c *tkey_i2c)
 	tkey_i2c->tsk_glove_lock_status = false;
 	touchkey_glovemode(tkey_i2c->tsk_glove_mode_status);
 #endif
+
+#ifdef LED_LDO_WITH_REGULATOR
+	change_touch_key_led_voltage(touchkey_voltage_brightness);
+#endif
+
 	enable_irq(tkey_i2c->irq);
 out:
 	mutex_unlock(&tkey_i2c->lock);
@@ -1155,7 +1215,6 @@ static int sec_touchkey_late_resume(struct early_suspend *h)
 	return 0;
 }
 #else
-#ifndef CONFIG_FB
 static int touchkey_suspend(struct device *dev)
 {
 	struct touchkey_i2c *tkey_i2c = dev_get_drvdata(dev);
@@ -1198,11 +1257,55 @@ static int touchkey_resume(struct device *dev)
 	return 0;
 }
 #endif
-#endif
-#ifndef CONFIG_FB
 static SIMPLE_DEV_PM_OPS(touchkey_pm_ops, touchkey_suspend, touchkey_resume);
+
 #endif
-#endif
+static void cypress_touchkey_interrupt_set_dual(struct i2c_client *client)
+{
+	struct touchkey_i2c *tkey_i2c = dev_get_drvdata(&client->dev);
+	int ret = 0;
+	int retry = 5;
+	u8 data[3] = {0, };
+
+	if (tkey_i2c->firmware_ver <= TK_MULTI_FW_VER) {
+		dev_err(&client->dev, "%s: not support this version\n", __func__);
+		return;
+	}
+
+	while (retry--) {
+		data[0] = TK_CMD_DUAL_DETECTION;
+		data[1] = 0x00;
+		data[2] = TK_BIT_DETECTION_CONFIRM;
+
+		ret = i2c_smbus_write_i2c_block_data(client, TK_DUAL_REG, 3, &data[0]);
+		if (ret < 0) {
+			dev_err(&client->dev, "%s: i2c write error. (%d)\n", __func__, ret);
+			msleep(30);
+			continue;
+		}
+		msleep(50);
+
+		data[0] = CYPRESS_DETECTION_FLAG;
+
+		ret = i2c_smbus_read_i2c_block_data(client, data[0], 1, &data[1]);
+		if (ret < 0) {
+			dev_err(&client->dev, "%s: i2c read error. (%d)\n", __func__, ret);
+			msleep(30);
+			continue;
+		}
+
+		if (data[1] != 1) {
+			dev_err(&client->dev,
+				"%s: interrupt set: 0x%X, failed.\n", __func__, data[1]);
+			continue;
+		}
+		tkey_i2c->support_multi_touch = data[1];
+
+		dev_info(&client->dev, "%s: interrupt set: 0x%X\n", __func__, tkey_i2c->support_multi_touch);
+		break;
+	}
+
+}
 
 static int touchkey_i2c_check(struct touchkey_i2c *tkey_i2c)
 {
@@ -1217,6 +1320,9 @@ static int touchkey_i2c_check(struct touchkey_i2c *tkey_i2c)
 
 	tkey_i2c->firmware_ver = data[1];
 	tkey_i2c->module_ver = data[2];
+
+	/* CYPRESS Firmware setting interrupt type : dual or single interrupt */
+	cypress_touchkey_interrupt_set_dual(tkey_i2c->client);
 
 	return ret;
 }
@@ -1236,6 +1342,13 @@ static ssize_t touchkey_led_control(struct device *dev,
 			__func__, __LINE__);
 		return size;
 	}
+
+#ifdef LED_LDO_WITH_REGULATOR
+	if (data > 1) {
+		update_touchkey_brightness(data);
+	}
+	data = data ? 1 : 0;
+#endif
 
 	if (data != 0 && data != 1) {
 		dev_err(&tkey_i2c->client->dev, "%s wrong cmd %x\n",
@@ -1264,48 +1377,6 @@ out:
 
 	return size;
 }
-
-#ifdef CONFIG_FB
-static int fb_prev_status = FB_BLANK_NORMAL;
-
-static int fb_notifier_callback(struct notifier_block *p,
-		unsigned long event, void *data)
-{
-	struct fb_event *evdata = data;
-	int new_status;
-	struct touchkey_i2c *tkey_i2c;
-
-	if (touchkey_probe != true) {
-		printk(KERN_ERR "%s: Touchkey is not enabled.\n", __func__);
-		return 0;
-	}
-
-	if (event == FB_EVENT_BLANK) {
-		tkey_i2c = container_of(p, struct touchkey_i2c, fb_notif);
-		new_status = (*(int *)evdata->data) ?
-			FB_BLANK_NORMAL : FB_BLANK_UNBLANK;
-		if (new_status == fb_prev_status)
-			return 0;
-
-		mutex_lock(&tkey_i2c->input_dev->mutex);
-		if (new_status == FB_BLANK_UNBLANK) {
-			if (tkey_i2c->input_dev->users)
-				touchkey_start(tkey_i2c);
-			dev_info(&tkey_i2c->client->dev,
-					"%s: starting touchkey\n", __func__);
-		} else {
-			if (tkey_i2c->input_dev->users)
-				touchkey_stop(tkey_i2c);
-			dev_info(&tkey_i2c->client->dev,
-					"%s: stopping touchkey\n", __func__);
-		}
-		mutex_unlock(&tkey_i2c->input_dev->mutex);
-		fb_prev_status = new_status;
-	}
-
-	return 0;
-}
-#endif
 
 #if defined(TK_USE_4KEY)
 static ssize_t touchkey_menu_show(struct device *dev,
@@ -1552,6 +1623,8 @@ static ssize_t set_touchkey_update_store(struct device *dev,
 		enable_irq(tkey_i2c->irq);
 		return count;
 	}
+
+	cypress_touchkey_interrupt_set_dual(tkey_i2c->client);
 
 #ifdef TEST_JIG_MODE
 	i2c_touchkey_write(tkey_i2c->client, &get_touch, 1);
@@ -1925,25 +1998,12 @@ tkey_firmupdate_retry_byreboot:
 	touchkey_autocalibration(tkey_i2c);
 #endif
 
-#ifdef CONFIG_FB
-	tkey_i2c->fb_notif.notifier_call = fb_notifier_callback;
-	ret = fb_register_client(&tkey_i2c->fb_notif);
-	if (ret < 0) {
-		dev_err(&client->dev, "Failed to register fb_notifier_callback (%d)\n",
-				ret);
-		goto err_fb_register;
-	}
-#endif
-
 	touchkey_stop(tkey_i2c);
 	complete_all(&tkey_i2c->init_done);
 	touchkey_probe = true;
 
 	return 0;
 
-#ifdef CONFIG_FB
-err_fb_register:
-#endif
 #if defined(TK_HAS_FIRMWARE_UPDATE)
 err_firmware_update:
 	tkey_i2c->pdata->led_power_on(0);
@@ -1970,9 +2030,7 @@ struct i2c_driver touchkey_i2c_driver = {
 		.name = "sec_touchkey_driver",
 		.owner = THIS_MODULE,
 #ifdef CONFIG_PM
-#ifndef CONFIG_FB
 		.pm = &touchkey_pm_ops,
-#endif
 #endif
 	},
 	.id_table = sec_touchkey_id,

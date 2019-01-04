@@ -60,6 +60,7 @@ static int dapm_up_seq[] = {
 	[snd_soc_dapm_virt_mux] = 5,
 	[snd_soc_dapm_value_mux] = 5,
 	[snd_soc_dapm_dac] = 6,
+	[snd_soc_dapm_switch] = 7,
 	[snd_soc_dapm_mixer] = 7,
 	[snd_soc_dapm_mixer_named_ctl] = 7,
 	[snd_soc_dapm_pga] = 8,
@@ -79,6 +80,7 @@ static int dapm_down_seq[] = {
 	[snd_soc_dapm_line] = 2,
 	[snd_soc_dapm_out_drv] = 2,
 	[snd_soc_dapm_pga] = 4,
+	[snd_soc_dapm_switch] = 5,
 	[snd_soc_dapm_mixer_named_ctl] = 5,
 	[snd_soc_dapm_mixer] = 5,
 	[snd_soc_dapm_dac] = 6,
@@ -729,7 +731,6 @@ static int is_connected_output_ep(struct snd_soc_dapm_widget *widget)
 		    (widget->id == snd_soc_dapm_line &&
 		     !list_empty(&widget->sources))) {
 			widget->outputs = snd_soc_dapm_suspend_check(widget);
-			path->walking = 0;
 			return widget->outputs;
 		}
 	}
@@ -740,19 +741,12 @@ static int is_connected_output_ep(struct snd_soc_dapm_widget *widget)
 		if (path->weak)
 			continue;
 
-		if (path->walking)
-			return 1;
-
 		if (path->walked)
 			continue;
 
 		if (path->sink && path->connect) {
 			path->walked = 1;
-			path->walking = 1;
-
 			con += is_connected_output_ep(path->sink);
-
-			path->walking = 0;
 		}
 	}
 
@@ -830,19 +824,12 @@ static int is_connected_input_ep(struct snd_soc_dapm_widget *widget)
 		if (path->weak)
 			continue;
 
-		if (path->walking)
-			return 1;
-
 		if (path->walked)
 			continue;
 
 		if (path->source && path->connect) {
 			path->walked = 1;
-			path->walking = 1;
-
 			con += is_connected_input_ep(path->source);
-
-			path->walking = 0;
 		}
 	}
 
@@ -1053,6 +1040,14 @@ static void dapm_seq_check_event(struct snd_soc_dapm_context *dapm,
 		break;
 	case SND_SOC_DAPM_POST_PMD:
 		ev_name = "POST_PMD";
+		power = 0;
+		break;
+	case SND_SOC_DAPM_WILL_PMU:
+		ev_name = "WILL_PMU";
+		power = 1;
+		break;
+	case SND_SOC_DAPM_WILL_PMD:
+		ev_name = "WILL_PMD";
 		power = 0;
 		break;
 	default:
@@ -1321,7 +1316,7 @@ static void dapm_post_sequence_async(void *data, async_cookie_t cookie)
 			dev_err(d->dev, "Failed to turn off bias: %d\n", ret);
 
 		if (d->dev)
-			pm_runtime_put_sync(d->dev);
+			pm_runtime_put(d->dev);
 	}
 
 	/* If we just powered up then move to active bias */
@@ -1538,6 +1533,14 @@ static int dapm_power_widgets(struct snd_soc_dapm_context *dapm, int event)
 		async_schedule_domain(dapm_pre_sequence_async, d,
 					&async_domain);
 	async_synchronize_full_domain(&async_domain);
+
+	list_for_each_entry(w, &down_list, power_list) {
+		dapm_seq_check_event(dapm, w, SND_SOC_DAPM_WILL_PMD);
+	}
+
+	list_for_each_entry(w, &up_list, power_list) {
+		dapm_seq_check_event(dapm, w, SND_SOC_DAPM_WILL_PMU);
+	}
 
 	/* Power down widgets first; try to avoid amplifying pops. */
 	dapm_seq_run(dapm, &down_list, event, false);
@@ -2113,10 +2116,6 @@ static int snd_soc_dapm_add_route(struct snd_soc_dapm_context *dapm,
 		path->connect = 0;
 		return 0;
 	}
-
-	dapm_mark_dirty(wsource, "Route added");
-	dapm_mark_dirty(wsink, "Route added");
-
 	return 0;
 
 err:
@@ -2201,7 +2200,6 @@ int snd_soc_dapm_add_routes(struct snd_soc_dapm_context *dapm,
 	for (i = 0; i < num; i++) {
 		ret = snd_soc_dapm_add_route(dapm, route);
 		if (ret < 0) {
-			msleep(1000);
 			dev_err(dapm->dev, "Failed to add route %s->%s\n",
 				route->source, route->sink);
 			break;
@@ -3369,7 +3367,7 @@ void snd_soc_dapm_shutdown(struct snd_soc_card *card)
 {
 	struct snd_soc_codec *codec;
 
-	list_for_each_entry(codec, &card->codec_dev_list, list) {
+	list_for_each_entry(codec, &card->codec_dev_list, card_list) {
 		soc_dapm_shutdown_codec(&codec->dapm);
 		if (codec->dapm.bias_level == SND_SOC_BIAS_STANDBY)
 			snd_soc_dapm_set_bias_level(&codec->dapm,

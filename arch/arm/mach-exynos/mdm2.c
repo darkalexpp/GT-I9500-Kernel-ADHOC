@@ -160,7 +160,9 @@ static void mdm_power_down_common(struct mdm_modem_drv *mdm_drv)
 		*/
 		msleep(4000);
 	}
+#ifdef CONFIG_UMTS_MODEM_XMM6360
 	mdm_peripheral_disconnect(mdm_drv);
+#endif
 }
 
 static void mdm_do_first_power_on(struct mdm_modem_drv *mdm_drv)

@@ -20,6 +20,7 @@
 #include <linux/workqueue.h>
 #include <linux/videodev2.h>
 #include <linux/videodev2_exynos_media.h>
+#include <linux/videodev2_exynos_media_ext.h>
 #include <media/videobuf2-core.h>
 
 #include "s5p_mfc_common.h"
@@ -116,7 +117,7 @@ static struct v4l2_queryctrl controls[] = {
 		.type = V4L2_CTRL_TYPE_INTEGER,
 		.name = "The period of intra frame",
 		.minimum = 0,
-		.maximum = (1 << 16) - 1,
+		.maximum = (1 << 30) - 1,
 		.step = 1,
 		.default_value = 0,
 	},
@@ -855,6 +856,24 @@ static struct v4l2_queryctrl controls[] = {
 		.step = 1,
 		.default_value = 0,
 	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_H264_HIERARCHICAL_CODING_LAYER_BIT,
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.name = "Hierarchical Coding Layer Bit",
+		.minimum = INT_MIN,
+		.maximum = INT_MAX,
+		.step = 1,
+		.default_value = 0,
+	},
+	{
+		.id = V4L2_CID_MPEG_VIDEO_H264_HIERARCHICAL_CODING_LAYER_CH,
+		.type = V4L2_CTRL_TYPE_INTEGER,
+		.name = "Hierarchical Coding Layer Change",
+		.minimum = INT_MIN,
+		.maximum = INT_MAX,
+		.step = 1,
+		.default_value = 0,
+	},
 };
 
 #define NUM_CTRLS ARRAY_SIZE(controls)
@@ -877,6 +896,13 @@ static int check_ctrl_val(struct s5p_mfc_ctx *ctx, struct v4l2_control *ctrl)
 	c = get_ctrl(ctrl->id);
 	if (!c)
 		return -EINVAL;
+	if (ctrl->id == V4L2_CID_MPEG_VIDEO_GOP_SIZE
+	    && ctrl->value > c->maximum) {
+		mfc_info("GOP_SIZE is changed to max(%d -> %d)\n",
+                                ctrl->value, c->maximum);
+		ctrl->value = c->maximum;
+	}
+
 	if (ctrl->value < c->minimum || ctrl->value > c->maximum
 	    || (c->step != 0 && ctrl->value % c->step != 0)) {
 		v4l2_err(&dev->v4l2_dev, "Invalid control value\n");
@@ -1020,6 +1046,78 @@ static struct s5p_mfc_ctrl_cfg mfc_ctrl_list[] = {
 		.flag_shft = 0,
 		.read_cst = enc_ctrl_read_cst,
 		.write_cst = NULL,
+	},
+	{	/* H.264 QP Max change */
+		.type = MFC_CTRL_TYPE_SET,
+		.id = V4L2_CID_MPEG_VIDEO_H264_MAX_QP,
+		.is_volatile = 1,
+		.mode = MFC_CTRL_MODE_CUSTOM,
+		.addr = S5P_FIMV_NEW_RC_QP_BOUND,
+		.mask = 0xFFFFFFFF,
+		.shft = 0,
+		.flag_mode = MFC_CTRL_MODE_CUSTOM,
+		.flag_addr = S5P_FIMV_PARAM_CHANGE_FLAG,
+		.flag_shft = 4,
+	},
+	{	/* H.264 QP Min change */
+		.type = MFC_CTRL_TYPE_SET,
+		.id = V4L2_CID_MPEG_VIDEO_H264_MIN_QP,
+		.is_volatile = 1,
+		.mode = MFC_CTRL_MODE_CUSTOM,
+		.addr = S5P_FIMV_NEW_RC_QP_BOUND,
+		.mask = 0xFFFFFFFF,
+		.shft = 0,
+		.flag_mode = MFC_CTRL_MODE_CUSTOM,
+		.flag_addr = S5P_FIMV_PARAM_CHANGE_FLAG,
+		.flag_shft = 4,
+	},
+	{	/* H.263 QP Max change */
+		.type = MFC_CTRL_TYPE_SET,
+		.id = V4L2_CID_MPEG_VIDEO_H263_MAX_QP,
+		.is_volatile = 1,
+		.mode = MFC_CTRL_MODE_CUSTOM,
+		.addr = S5P_FIMV_NEW_RC_QP_BOUND,
+		.mask = 0xFFFFFFFF,
+		.shft = 0,
+		.flag_mode = MFC_CTRL_MODE_CUSTOM,
+		.flag_addr = S5P_FIMV_PARAM_CHANGE_FLAG,
+		.flag_shft = 4,
+	},
+	{	/* H.263 QP Min change */
+		.type = MFC_CTRL_TYPE_SET,
+		.id = V4L2_CID_MPEG_VIDEO_H263_MIN_QP,
+		.is_volatile = 1,
+		.mode = MFC_CTRL_MODE_CUSTOM,
+		.addr = S5P_FIMV_NEW_RC_QP_BOUND,
+		.mask = 0xFFFFFFFF,
+		.shft = 0,
+		.flag_mode = MFC_CTRL_MODE_CUSTOM,
+		.flag_addr = S5P_FIMV_PARAM_CHANGE_FLAG,
+		.flag_shft = 4,
+	},
+	{	/* MPEG4 QP Max change */
+		.type = MFC_CTRL_TYPE_SET,
+		.id = V4L2_CID_MPEG_VIDEO_MPEG4_MAX_QP,
+		.is_volatile = 1,
+		.mode = MFC_CTRL_MODE_CUSTOM,
+		.addr = S5P_FIMV_NEW_RC_QP_BOUND,
+		.mask = 0xFFFFFFFF,
+		.shft = 0,
+		.flag_mode = MFC_CTRL_MODE_CUSTOM,
+		.flag_addr = S5P_FIMV_PARAM_CHANGE_FLAG,
+		.flag_shft = 4,
+	},
+	{	/* MPEG4 QP Min change */
+		.type = MFC_CTRL_TYPE_SET,
+		.id = V4L2_CID_MPEG_VIDEO_MPEG4_MIN_QP,
+		.is_volatile = 1,
+		.mode = MFC_CTRL_MODE_CUSTOM,
+		.addr = S5P_FIMV_NEW_RC_QP_BOUND,
+		.mask = 0xFFFFFFFF,
+		.shft = 0,
+		.flag_mode = MFC_CTRL_MODE_CUSTOM,
+		.flag_addr = S5P_FIMV_PARAM_CHANGE_FLAG,
+		.flag_shft = 4,
 	},
 };
 
@@ -1372,6 +1470,7 @@ static int enc_set_buf_ctrls_val(struct s5p_mfc_ctx *ctx, struct list_head *head
 {
 	struct s5p_mfc_buf_ctrl *buf_ctrl;
 	struct s5p_mfc_enc *enc = ctx->enc_priv;
+	struct s5p_mfc_dev *dev = ctx->dev;
 	unsigned int value = 0;
 
 	list_for_each_entry(buf_ctrl, head, list) {
@@ -1413,6 +1512,14 @@ static int enc_set_buf_ctrls_val(struct s5p_mfc_ctx *ctx, struct list_head *head
 
 		if (buf_ctrl->id == V4L2_CID_MPEG_MFC51_VIDEO_FRAME_TAG)
 			enc->stored_tag = buf_ctrl->val;
+		if ((buf_ctrl->id == V4L2_CID_MPEG_MFC51_VIDEO_I_PERIOD_CH) && FW_HAS_GOP2(dev)) {
+			value = 0;
+			value = s5p_mfc_read_reg(S5P_FIMV_E_GOP_CONFIG2);
+			buf_ctrl->old_val |= (value << 16) & 0x3FFF0000;
+			value &= ~(0x3FFF);
+			value |= (buf_ctrl->val >> 16) & 0x3FFF;
+			s5p_mfc_write_reg(value, S5P_FIMV_E_GOP_CONFIG2);
+		}
 
 		mfc_debug(8, "Set buffer control "\
 				"id: 0x%08x val: %d\n",
@@ -1455,6 +1562,7 @@ static int enc_recover_buf_ctrls_val(struct s5p_mfc_ctx *ctx,
 						struct list_head *head)
 {
 	struct s5p_mfc_buf_ctrl *buf_ctrl;
+	struct s5p_mfc_dev *dev = ctx->dev;
 	unsigned int value = 0;
 
 	list_for_each_entry(buf_ctrl, head, list) {
@@ -1491,6 +1599,13 @@ static int enc_recover_buf_ctrls_val(struct s5p_mfc_ctx *ctx,
 		mfc_debug(8, "Recover buffer control "\
 				"id: 0x%08x old val: %d\n",
 				buf_ctrl->id, buf_ctrl->old_val);
+		if (buf_ctrl->id == V4L2_CID_MPEG_MFC51_VIDEO_I_PERIOD_CH && FW_HAS_GOP2(dev)) {
+			value = 0;
+			value = s5p_mfc_read_reg(S5P_FIMV_E_GOP_CONFIG2);
+			value &= ~(0x3FFF);
+			value |= (buf_ctrl->old_val >> 16) & 0x3FFF;
+			s5p_mfc_write_reg(value, S5P_FIMV_E_GOP_CONFIG2);
+		}
 	}
 
 	return 0;
@@ -1579,9 +1694,9 @@ static int enc_post_seq_start(struct s5p_mfc_ctx *ctx)
 		ctx->state = MFCINST_RUNNING;
 
 		if (s5p_mfc_enc_ctx_ready(ctx)) {
-			spin_lock(&dev->condlock);
+			spin_lock_irq(&dev->condlock);
 			set_bit(ctx->num, &dev->ctx_work_bits);
-			spin_unlock(&dev->condlock);
+			spin_unlock_irq(&dev->condlock);
 		}
 		queue_work(dev->sched_wq, &dev->sched_work);
 	}
@@ -1700,9 +1815,9 @@ static int enc_post_frame_start(struct s5p_mfc_ctx *ctx)
 
 	if (enc->in_slice) {
 		if (ctx->dst_queue_cnt == 0) {
-			spin_lock(&dev->condlock);
+			spin_lock_irq(&dev->condlock);
 			clear_bit(ctx->num, &dev->ctx_work_bits);
-			spin_unlock(&dev->condlock);
+			spin_unlock_irq(&dev->condlock);
 		}
 
 		spin_unlock_irqrestore(&dev->irqlock, flags);
@@ -1799,9 +1914,9 @@ static int enc_post_frame_start(struct s5p_mfc_ctx *ctx)
 	}
 
 	if ((ctx->src_queue_cnt == 0) || (ctx->dst_queue_cnt == 0)) {
-		spin_lock(&dev->condlock);
+		spin_lock_irq(&dev->condlock);
 		clear_bit(ctx->num, &dev->ctx_work_bits);
-		spin_unlock(&dev->condlock);
+		spin_unlock_irq(&dev->condlock);
 	}
 
 	spin_unlock_irqrestore(&dev->irqlock, flags);
@@ -1997,6 +2112,11 @@ static int vidioc_s_fmt(struct file *file, void *priv, struct v4l2_format *f)
 	int ret = 0;
 
 	mfc_debug_enter();
+
+	if (ctx->state == MFCINST_ERROR) {
+		mfc_err("Normal and DRM instance could not run at the same time\n");
+		return -EINVAL;
+	}
 
 	ret = vidioc_try_fmt(file, priv, f);
 	if (ret)
@@ -2721,6 +2841,10 @@ static int set_enc_param(struct s5p_mfc_ctx *ctx, struct v4l2_control *ctrl)
 		p->codec.h264.hier_qp_layer_qp[(ctrl->value >> 16) & 0x7]
 			= ctrl->value & 0xFF;
 		break;
+	case V4L2_CID_MPEG_VIDEO_H264_HIERARCHICAL_CODING_LAYER_BIT:
+		p->codec.h264.hier_qp_layer_bit[(ctrl->value >> 28) & 0x7]
+			= ctrl->value & 0x7FFFFFF;
+		break;
 	case V4L2_CID_MPEG_VIDEO_H264_SEI_FRAME_PACKING:
 		p->codec.h264.sei_gen_enable = ctrl->value;
 		break;
@@ -2855,6 +2979,17 @@ static int set_ctrl_val(struct s5p_mfc_ctx *ctx, struct v4l2_control *ctrl)
 	case V4L2_CID_MPEG_VIDEO_QOS_RATIO:
 		ctx->qos_ratio = ctrl->value;
 		break;
+	case V4L2_CID_MPEG_VIDEO_H264_MAX_QP:
+	case V4L2_CID_MPEG_VIDEO_H263_MAX_QP:
+	case V4L2_CID_MPEG_VIDEO_MPEG4_MAX_QP:
+		ctx->qp_max_change = ctrl->value;
+		break;
+	case V4L2_CID_MPEG_VIDEO_H264_MIN_QP:
+	case V4L2_CID_MPEG_VIDEO_H263_MIN_QP:
+	case V4L2_CID_MPEG_VIDEO_MPEG4_MIN_QP:
+		ctx->qp_min_change = ctrl->value;
+		ctrl->value = ((ctx->qp_max_change << 8)
+			| (ctx->qp_min_change));
 	case V4L2_CID_MPEG_MFC51_VIDEO_FRAME_TAG:
 	case V4L2_CID_MPEG_MFC51_VIDEO_FORCE_FRAME_TYPE:
 	case V4L2_CID_MPEG_MFC51_VIDEO_I_PERIOD_CH:
