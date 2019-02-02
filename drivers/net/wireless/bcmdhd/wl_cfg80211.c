@@ -1082,6 +1082,10 @@ wl_cfg80211_default_mgmt_stypes[NUM_NL80211_IFTYPES] = {
 		BIT(IEEE80211_STYPE_PROBE_REQ >> 4)
 	},
 #endif /* WL_CFG80211_P2P_DEV_IF */
+	[NL80211_IFTYPE_MONITOR] = {
+		.tx = 0xffff,
+		.rx = 0xffff
+	},
 };
 
 static void swap_key_from_BE(struct wl_wsec_key *key)
@@ -1702,6 +1706,8 @@ wl_cfg80211_change_virtual_iface(struct wiphy *wiphy, struct net_device *ndev,
 	s32 ap = 0;
 	s32 infra = 0;
 	s32 ibss = 0;
+	s32 mon = 0;
+	s32 promisc = 0;
 	s32 wlif_type;
 	s32 mode = 0;
 	s32 err = BCME_OK;
@@ -1711,6 +1717,10 @@ wl_cfg80211_change_virtual_iface(struct wiphy *wiphy, struct net_device *ndev,
 	WL_DBG(("Enter type %d\n", type));
 	switch (type) {
 	case NL80211_IFTYPE_MONITOR:
+		mon = 2;
+		promisc = 1;
+		mode = WL_MODE_MONITOR;
+			break;
 	case NL80211_IFTYPE_WDS:
 	case NL80211_IFTYPE_MESH_POINT:
 		ap = 1;
@@ -1782,6 +1792,18 @@ wl_cfg80211_change_virtual_iface(struct wiphy *wiphy, struct net_device *ndev,
 	} else {
 		WL_DBG(("Change_virtual_iface for transition from GO/AP to client/STA"));
 	}
+
+	if (mon) {
+		ndev->type = ARPHRD_IEEE80211_RADIOTAP;
+	} else {
+		ndev->type = ARPHRD_ETHER;
+	}
+
+	if (!ap) {
+	wldev_ioctl(ndev, WLC_SET_INFRA, &infra, sizeof(s32), true);
+	wldev_ioctl(ndev, WLC_SET_PROMISC, &promisc, sizeof(s32), true);
+	wldev_ioctl(ndev, WLC_SET_MONITOR, &mon, sizeof(s32), true);
+	wl_set_mode_by_netdev(cfg, ndev, mode);
 
 	if (ibss) {
 		infra = 0;
@@ -7552,6 +7574,7 @@ static struct cfg80211_ops wl_cfg80211_ops = {
 	.mgmt_tx = wl_cfg80211_mgmt_tx,
 	.mgmt_frame_register = wl_cfg80211_mgmt_frame_register,
 	.change_bss = wl_cfg80211_change_bss,
+	.set_monitor_channel = wl_cfg80211_set_monitor_channel,
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 6, 0)) || defined(WL_COMPAT_WIRELESS)
 	.set_channel = wl_cfg80211_set_channel,
 #endif /* ((LINUX_VERSION < VERSION(3, 6, 0)) || WL_COMPAT_WIRELESS */
@@ -7593,6 +7616,8 @@ s32 wl_mode_to_nl80211_iftype(s32 mode)
 		return NL80211_IFTYPE_ADHOC;
 	case WL_MODE_AP:
 		return NL80211_IFTYPE_AP;
+	case WL_MODE_MONITOR:
+		return NL80211_IFTYPE_MONITOR;
 	default:
 		return NL80211_IFTYPE_UNSPECIFIED;
 	}
@@ -7653,9 +7678,9 @@ static s32 wl_setup_wiphy(struct wireless_dev *wdev, struct device *sdiofunc_dev
 	wdev->wiphy->interface_modes =
 		BIT(NL80211_IFTYPE_STATION)
 		| BIT(NL80211_IFTYPE_ADHOC)
-#if !defined(WL_ENABLE_P2P_IF)
+//#if !defined(WL_ENABLE_P2P_IF)
 		| BIT(NL80211_IFTYPE_MONITOR)
-#endif /* !WL_ENABLE_P2P_IF */
+//#endif /* !WL_ENABLE_P2P_IF */
 #if defined(WL_IFACE_COMB_NUM_CHANNELS) || defined(WL_CFG80211_P2P_DEV_IF)
 		| BIT(NL80211_IFTYPE_P2P_CLIENT)
 		| BIT(NL80211_IFTYPE_P2P_GO)
@@ -10980,8 +11005,14 @@ static s32 wl_config_ifmode(struct bcm_cfg80211 *cfg, struct net_device *ndev, s
 	s32 infra = 0;
 	s32 err = 0;
 	s32 mode = 0;
+	s32 mon = 0;
+	s32 promisc = 0;
 	switch (iftype) {
 	case NL80211_IFTYPE_MONITOR:
+		mode = WL_MODE_MONITOR;
+		mon = 2;
+		promisc = 1;
+		break;
 	case NL80211_IFTYPE_WDS:
 		WL_ERR(("type (%d) : currently we do not support this mode\n",
 			iftype));
@@ -11006,10 +11037,29 @@ static s32 wl_config_ifmode(struct bcm_cfg80211 *cfg, struct net_device *ndev, s
 		return err;
 	}
 	infra = htod32(infra);
+	mon = htod32(mon);
+	promisc = htod32(promisc);
+
 	err = wldev_ioctl(ndev, WLC_SET_INFRA, &infra, sizeof(infra), true);
 	if (unlikely(err)) {
 		WL_ERR(("WLC_SET_INFRA error (%d)\n", err));
 		return err;
+	}
+	err = wldev_ioctl(ndev, WLC_SET_PROMISC, &promisc, sizeof(s32), true);
+	if (unlikely(err)) {
+		WL_ERR(("WLC_SET_PROMISC error (%d)\n", err));
+		return err;
+	}
+	err = wldev_ioctl(ndev, WLC_SET_MONITOR, &mon, sizeof(mon), true);
+	if (unlikely(err)) {
+		WL_ERR(("WLC_SET_MONITOR error (%d)\n", err));
+		return err;
+	}
+
+	if (mon) {
+		ndev->type = ARPHRD_IEEE80211_RADIOTAP;
+	} else {
+		ndev->type = ARPHRD_ETHER;
 	}
 
 	wl_set_mode_by_netdev(cfg, ndev, mode);
