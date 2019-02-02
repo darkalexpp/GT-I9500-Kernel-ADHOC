@@ -1805,22 +1805,21 @@ wl_cfg80211_change_virtual_iface(struct wiphy *wiphy, struct net_device *ndev,
 	wldev_ioctl(ndev, WLC_SET_MONITOR, &mon, sizeof(s32), true);
 	wl_set_mode_by_netdev(cfg, ndev, mode);
 
-	if (ibss) {
-		infra = 0;
-		wl_set_mode_by_netdev(cfg, ndev, mode);
-		err = wldev_ioctl(ndev, WLC_SET_INFRA, &infra, sizeof(s32), true);
-		if (err < 0) {
-			WL_ERR(("SET Adhoc error %d\n", err));
-			return -EINVAL;
-		}
+//	if (ibss) {
+//		infra = 0;
+//		wl_set_mode_by_netdev(cfg, ndev, mode);
+//		err = wldev_ioctl(ndev, WLC_SET_INFRA, &infra, sizeof(s32), true);
+//		if (err < 0) {
+//			WL_ERR(("SET Adhoc error %d\n", err));
+//			return -EINVAL;
+//		}
 	}
 
 	ndev->ieee80211_ptr->iftype = type;
 	return 0;
 }
 
-s32
-wl_cfg80211_notify_ifadd(int ifidx, char *name, uint8 *mac, uint8 bssidx)
+s32 wl_cfg80211_notify_ifadd(int ifidx, char *name, uint8 *mac, uint8 bssidx)
 {
 	struct bcm_cfg80211 *cfg = g_bcm_cfg;
 
@@ -6157,6 +6156,18 @@ change_bw:
 	return err;
 }
 
+static s32 
+wl_cfg80211_set_monitor_channel(struct wiphy *wiphy3, struct cfg80211_chan_def *chandef)
+{
+
+s32 err = BCME_OK;
+	struct bcm_cfg80211 *cfg = wiphy_priv(wiphy3);
+	struct net_device *dev3 = bcmcfg_to_prmry_ndev(cfg);
+	enum nl80211_channel_type channel_type3 = cfg80211_get_chandef_type(chandef);
+	err = wl_cfg80211_set_channel(wiphy3, dev3, chandef->chan, channel_type3);
+	return err;
+}
+
 #ifdef WL_CFG80211_VSDB_PRIORITIZE_SCAN_REQUEST
 struct net_device *
 wl_cfg80211_get_remain_on_channel_ndev(struct bcm_cfg80211 *cfg)
@@ -7574,8 +7585,8 @@ static struct cfg80211_ops wl_cfg80211_ops = {
 	.mgmt_tx = wl_cfg80211_mgmt_tx,
 	.mgmt_frame_register = wl_cfg80211_mgmt_frame_register,
 	.change_bss = wl_cfg80211_change_bss,
-	.set_monitor_channel = wl_cfg80211_set_monitor_channel,
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 6, 0)) || defined(WL_COMPAT_WIRELESS)
+	//.set_monitor_channel = wl_cfg80211_set_monitor_channel,
 	.set_channel = wl_cfg80211_set_channel,
 #endif /* ((LINUX_VERSION < VERSION(3, 6, 0)) || WL_COMPAT_WIRELESS */
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 4, 0)) && !defined(WL_COMPAT_WIRELESS)

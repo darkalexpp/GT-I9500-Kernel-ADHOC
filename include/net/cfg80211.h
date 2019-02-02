@@ -1268,6 +1268,30 @@ struct cfg80211_pmksa {
 	u8 *bssid;
 	u8 *pmkid;
 };
+struct cfg80211_chan_def {
+	struct ieee80211_channel *chan;
+	enum nl80211_chan_width width;
+	u32 center_freq1;
+	u32 center_freq2;
+};
+
+static inline enum nl80211_channel_type
+cfg80211_get_chandef_type(const struct cfg80211_chan_def *chandef)
+{
+	switch (chandef->width) {
+	case NL80211_CHAN_WIDTH_20_NOHT:
+		return NL80211_CHAN_NO_HT;
+	case NL80211_CHAN_WIDTH_20:
+		return NL80211_CHAN_HT20;
+	case NL80211_CHAN_WIDTH_40:
+		if (chandef->center_freq1 > chandef->chan->center_freq)
+			return NL80211_CHAN_HT40PLUS;
+		return NL80211_CHAN_HT40MINUS;
+	default:
+		WARN_ON(1);
+		return NL80211_CHAN_NO_HT;
+	}
+}
 
 /**
  * struct cfg80211_wowlan_trig_pkt_pattern - packet pattern
