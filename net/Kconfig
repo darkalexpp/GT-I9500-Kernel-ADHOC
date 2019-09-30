@@ -229,6 +229,7 @@ source "net/sched/Kconfig"
 source "net/dcb/Kconfig"
 source "net/dns_resolver/Kconfig"
 source "net/batman-adv/Kconfig"
+source "net/kaodv-uu/Kconfig"
 source "net/openvswitch/Kconfig"
 
 config RPS

@@ -1,0 +1,8 @@
+#
+# B.A.T.M.A.N meshing protocol
+#
+
+config AODV_UU
+	tristate "AODV-UU "
+        default m
+
