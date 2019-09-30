@@ -64,7 +64,7 @@ struct kaodv_queue_entry {
 typedef int (*kaodv_queue_cmpfn) (struct kaodv_queue_entry *, unsigned long);
 
 static unsigned int queue_maxlen = KAODV_QUEUE_QMAX_DEFAULT;
-static rwlock_t queue_lock = RW_LOCK_UNLOCKED;
+static rwlock_t queue_lock = __RW_LOCK_UNLOCKED(queue_lock);
 static unsigned int queue_total;
 static LIST_HEAD(queue_list);
 

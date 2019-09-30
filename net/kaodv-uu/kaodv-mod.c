@@ -320,8 +320,9 @@ module_param_array(ifname, charp, &num_parms, 0444);
 #endif
 module_param(qual_th, int, 0);
 #else
-MODULE_PARM(ifname, "1-" __MODULE_STRING(MAX_INTERFACES) "s");
-MODULE_PARM(qual_th, "i");
+//TODO
+MODULE_PARM_DESC(ifname, "1-" __MODULE_STRING(MAX_INTERFACES) "s");
+MODULE_PARM_DESC(qual_th, "i");
 #endif
 
 static struct nf_hook_ops kaodv_ops[] = {
@@ -378,9 +379,9 @@ static int __init kaodv_init(void)
 	struct net_device *dev = NULL;
 	int i, ret = -ENOMEM;
 
-#ifndef KERNEL26
-	EXPORT_NO_SYMBOLS;
-#endif
+//#ifndef KERNEL26
+//	EXPORT_NO_SYMBOLS;
+//#endif
 
 	kaodv_expl_init();
 

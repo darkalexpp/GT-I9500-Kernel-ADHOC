@@ -28,10 +28,11 @@
 #include <linux/spinlock.h>
 #include <linux/netlink.h>
 #include <linux/version.h>
+#include <linux/mutex.h>
 
-#ifdef KERNEL26
+//#ifdef KERNEL26
 #include <linux/security.h>
-#endif
+//#endif
 #include <net/sock.h>
 
 #include "kaodv-netlink.h"
@@ -42,14 +43,17 @@
 
 static int peer_pid;
 static struct sock *kaodvnl;
-static DECLARE_MUTEX(kaodvnl_sem);
+//TODO
+static DEFINE_MUTEX(kaodvnl_sem);
+//static DECLARE_MUTEX(kaodvnl_sem);
 
-/* For 2.4 backwards compatibility */
+//* For 2.4 backwards compatibility */
+/*
 #ifndef KERNEL26
 #define sk_receive_queue receive_queue
 #define sk_socket socket
 #endif
-
+*/
 extern int active_route_timeout, qual_th, is_gateway;
 
 static struct sk_buff *kaodv_netlink_build_msg(int type, void *data, int len)
@@ -324,7 +328,7 @@ static void kaodv_netlink_rcv_sk(struct sock *sk, int len)
 	do {
 		struct sk_buff *skb;
 
-		if (down_trylock(&kaodvnl_sem))
+		if (mutex_lock(&kaodvnl_sem))
 			return;
 
 		while ((skb = skb_dequeue(&sk->sk_receive_queue)) != NULL) {
@@ -332,7 +336,7 @@ static void kaodv_netlink_rcv_sk(struct sock *sk, int len)
 			kfree_skb(skb);
 		}
 
-		up(&kaodvnl_sem);
+		mutex_unlock(&kaodvnl_sem);
 
 	} while (kaodvnl && kaodvnl->sk_receive_queue.qlen);
 
@@ -364,8 +368,12 @@ int kaodv_netlink_init(void)
 void kaodv_netlink_fini(void)
 {
 	sock_release(kaodvnl->sk_socket);
-	down(&kaodvnl_sem);
-	up(&kaodvnl_sem);
+
+	//down(&kaodvnl_sem);
+	//up(&kaodvnl_sem);
+	mutex_lock(&kaodvnl_sem);
+	mutex_unlock(&kaodvnl_sem);
 
 	netlink_unregister_notifier(&kaodv_nl_notifier);
 }
+

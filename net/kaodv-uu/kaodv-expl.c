@@ -37,7 +37,7 @@
 #define EXPL_MAX_LEN 1024
 
 static unsigned int expl_len;
-static rwlock_t expl_lock = RW_LOCK_UNLOCKED;
+static rwlock_t expl_lock = __RW_LOCK_UNLOCKED(expl_lock);
 static LIST_HEAD(expl_head);
 
 #define list_is_first(e) (&e->l == expl_head.next)

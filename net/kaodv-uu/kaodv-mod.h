@@ -5,6 +5,7 @@
 #include <linux/inetdevice.h>
 #include <linux/list.h>
 #include <linux/spinlock.h>
+#include <linux/module.h>
 
 /* Interface information */
 struct if_info {
@@ -15,7 +16,8 @@ struct if_info {
 };
 
 static LIST_HEAD(ifihead);
-static rwlock_t ifilock = RW_LOCK_UNLOCKED;
+//TODO
+static rwlock_t ifilock = __RW_LOCK_UNLOCKED(ifilock);
 /* extern struct list_head ifihead; */
 /* extern rwlock_t ifilock; */
 

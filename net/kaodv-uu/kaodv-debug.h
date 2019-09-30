@@ -23,6 +23,7 @@
 #define _KAODV_DEBUG_H
 
 #include <linux/in.h>
+#include <linux/kernel.h>
 
 #ifdef DEBUG
 //#undef DEBUG
